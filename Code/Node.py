@@ -23,6 +23,11 @@ class Node(Thread):
         self.lock1 = RLock()                            # Node critical point mechanism 1
         self.lock2 = RLock()                            # Node critical point mechanism 2
         self.lock3 = RLock()                            # Node critical point mechanism 3
+        
+        self.total_jumps = 0
+        self.total_lookups = 0
+        self.jump_counter = 0
+
         self.localAddress = address                     # InetSocketAddress(ip, port) of the node
         self.failure_recovery = _r > 0                  # Is failure recovery requested?
         self.r = _r                                     # MySuccessors' list length if failure recovery is required
@@ -152,7 +157,7 @@ class Node(Thread):
 # Try to find node's new successor with an appropriate finger or node's predecessor
     def fillSuccessor(self):
         successor = self.getSuccessor()
-
+        self.total_lookups += 1
         if successor is None or successor.equals(self.localAddress):
             for idx_finger in range(2, 33):
                 i_th_finger = self.FingerTable[idx_finger]
@@ -327,6 +332,7 @@ class Node(Thread):
             if node_addr.equals(self.localAddress): # searching within current node
                 node_addr = self.closest_preceding_finger(search_id)
             else: # forward request : Hop
+                self.total_jumps += 1
                 response_addr = requestAddress(node_addr, "FindClosest_" + str(search_id))
                 if response_addr is None:
                     node_addr = recently_alive_addr
@@ -349,7 +355,14 @@ class Node(Thread):
                 search_node_id_relative_id = computeRelativeId(search_id, node_addr.hash())
             if pred_node_addr.equals(node_addr):
                 break
+        self.total_jumps += self.jump_counter
+        self.jump_counter = 0
         return node_addr
+
+    def getAverageJumps(self):
+        if self.total_lookups == 0:
+            return 0
+        return self.total_jumps / self.total_lookups
 
 # Query for local_id's successor
 # Returns local_id's successor InetSocketAddress(ip, port)
@@ -427,3 +440,10 @@ class Node(Thread):
 # Preparing node to stop executing its main run procedure
     def prepare_to_die(self):
         self.alive = False
+
+    def logAverageJumps(self):
+        if self.total_lookups == 0:
+            avg_jumps = 0
+        else:
+            avg_jumps = self.total_jumps / self.total_lookups
+        print(f"Node {self.localAddress.to_string()} - Average jumps: {avg_jumps}")

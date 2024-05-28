@@ -405,6 +405,8 @@ def define_args():
     if args.fr: return args.n, args.d, args.fn, args.fs, True, args.fr
     else: return args.n, args.d, args.fn, args.fs, False, 0
 
+
+
 #main procedure of the program
 
 if __name__ == "__main__":
@@ -421,9 +423,9 @@ if __name__ == "__main__":
     global r
     global stat_id
     print("---------------^--------------------------------^---------------------------------------------")
-    print('|CHORD - SIMULATION')
-    print('|Developed by: Ioannis Chatzimichalis Eirini Rouchota Christina Papastavrou Christos Georgiadis')
-    print('|CEID-Feb 2022')
+    # print('|CHORD - SIMULATION')
+    # print('|Developed by: Ioannis Chatzimichalis Eirini Rouchota Christina Papastavrou Christos Georgiadis')
+    # print('|CEID-Feb 2022')
     print("---------------ν--------------------------------ν---------------------------------------------")
     #CheckArgs(sys.argv)
     n, data_records_to_be_read, input_file_name, statistics_file_name, failure_recovery, r = define_args()
@@ -469,4 +471,9 @@ if __name__ == "__main__":
             print("Enter to continue :", end='')
             input("")
         else:
+            print("Average jumps for each node:")
+            for node in AllNodes.values():
+                node.logAverageJumps()
+
             os.kill(os.getpid(), signal.SIGTERM)
+        
