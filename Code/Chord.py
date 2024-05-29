@@ -17,7 +17,14 @@ import graphviz
 import re
 from traceback import print_exc
 from datetime import datetime
-from multiprocessing import Process, Queue, Pool
+from multiprocessing import Process, Queue, Pool, Lock
+import multiprocessing as mp
+import logging
+
+logging.basicConfig(level=logging.INFO,
+                    format='%(asctime)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
+
 
 # Global variables
 m = 32                          # m bits of Chord ring
@@ -236,30 +243,55 @@ def DisplayNetworkC():
     for indx, node in AllNodes.items():
         node.printMyData()
 
-# add a new node to the Chord Ring notifying it whether r successor should be stored
-# if failure recovery is required by the user
-def AddNewNode(init_phase):
-    global AllNodes
-    global next_available_port
-    global pc_ip
-    global r
-
-    loc_new_node_address = InetSocketAddress(pc_ip, next_available_port)
-    next_available_port += 1
-    loc_new_node = Node(loc_new_node_address, r, init_phase)
+def add_node_process(ip, port, r):
+    loc_new_node_address = InetSocketAddress(ip, port)
+    loc_new_node = Node(loc_new_node_address, r, True)
     AllNodes[loc_new_node_address.to_string()] = loc_new_node
     loc_new_node.activate()
-
-    start = time.process_time_ns()
     loc_new_node.chordjoin(AllNodes[node0_address.to_string()])
-    end = time.process_time_ns()
-    elapsed_time = elapsed(end, start)
-    stat_str = f"{stat_id},AddNewNode,{len(AllNodes.items())},{elapsed_time}"
-    fprint("AddNewNode", elapsed_time)
-
-    if r>0:
+    if r > 0:
         loc_new_node.FillMySuccessors()
-        #loc_new_node.move_keys()
+
+
+def is_port_in_use(port):
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        return s.connect_ex(('localhost', port)) == 0
+
+
+# add a new node to the Chord Ring notifying it whether r successor should be stored
+# if failure recovery is required by the user
+def add_node_process(ip, port, r):
+    try:
+        loc_new_node_address = InetSocketAddress(ip, port)
+        loc_new_node = Node(loc_new_node_address, r, True)
+        AllNodes[loc_new_node_address.to_string()] = loc_new_node
+        loc_new_node.activate()
+        loc_new_node.chordjoin(AllNodes[node0_address.to_string()])
+        if r > 0:
+            loc_new_node.FillMySuccessors()
+    except Exception as e:
+        logger.error(f"Error in add_node_process: {e}")
+
+def AddNewNode(init_phase):
+    global next_available_port
+
+    while True:
+        port = next_available_port
+        next_available_port += 1  # 使用原子操作
+
+        if is_port_in_use(port):
+            continue
+        else:
+            break
+
+    p = mp.Process(target=add_node_process, args=(pc_ip, port, r))
+    p.start()
+    p.join(timeout=5)  # 等待子进程结束,最多等5秒
+    if p.is_alive():   # 如果5秒后子进程还在运行
+        logger.warning(f"Timeout waiting for add_node_process {port}, terminating...")
+        p.terminate()  # 强制终止子进程
+    time.sleep(0.1)
+    return p
 
 # A new node will be created and is going to join the Chord Ring
 def NewNodeJoins():
@@ -469,10 +501,24 @@ if __name__ == "__main__":
     AllNodes[node0_address.to_string()] = new_node0
     new_node0.activate()
 
+    lock = Lock()
+
     #create all the others nodes of the initial Chord ring congiguration
+    with mp.Pool(processes=32) as pool:
+        processes = []
     for i in range(1, n):
-        AddNewNode(True)
-        display_progress("Creating initial configuration of the Chord ring", i, n)
+        if len(mp.active_children()) >= 128:  # 如果当前子进程数超过128
+            logger.warning("Too many active processes, waiting...")
+            time.sleep(1)  # 等待1秒再检查
+        p = AddNewNode(True)
+        processes.append(p)
+        logger.info(f"Created node {i}/{n}")
+
+    for p in processes:
+        p.join(timeout=5)  # 等待所有子进程结束,每个最多等5秒
+        if p.is_alive():
+            logger.warning(f"Timeout waiting for node process, terminating...")
+            p.terminate()
 
     end1 = time.process_time_ns()
     print(f"\n\tInitial configuration of the Chord ring has been created in {elapsed(end1, start)} seconds.")
