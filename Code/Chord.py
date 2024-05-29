@@ -17,6 +17,7 @@ import graphviz
 import re
 from traceback import print_exc
 from datetime import datetime
+from multiprocessing import Process, Queue, Pool
 
 # Global variables
 m = 32                          # m bits of Chord ring
@@ -87,32 +88,46 @@ def delete_record_from_node(key, contact_node):
     else:
         sendRequest(sent_to_node_addr, request)
 
+
+def load_data_process(filename, n, q):
+    df1 = read_csv(filename)
+    df = df1.head(n)
+    data = []
+    for index, row in df.iterrows():
+        mstr = ",".join([str(row[i]) for i in range(1, len(df.columns))])
+        data.append((int(row[0]), mstr))
+    q.put(data)
+
 # load #records_to_load records from csv file on the ring though node
 # Each record is being routed to a node using its identifier and successor(key)=node
 def load_file_on_the_ring(node, records_to_load):
     global input_file_name
-    global delimiter
     global data_records_to_be_read
     global init_records
     global SearchKeys
 
+    q = Queue()
+    p = Process(target=load_data_process, args=(input_file_name, data_records_to_be_read, q))
+    p.start()
+
+    data = q.get()
+    p.join()
+
     SearchKeys = []
     init_records = 0
-    try:
-        df1 = read_csv(input_file_name)
-        df = df1.head(data_records_to_be_read)
-        for index, row in df.iterrows():
-            display_progress("Loading init data from input file to the ring nodes (through the first Node)", init_records,records_to_load)
-            mstr = ""
-            for n in range(1, len(df.columns)):
-                mstr = mstr + "," + str(row[n])
-            SearchKeys.append(int(row[0]))
-            load_record_to_node(int(row[0]), mstr[1:], node)
-            init_records += 1
-    except Exception as e:
-        print_exc()
-        print(f"Unable to load initial input file...{input_file}")
-        exit(-5)
+    for key, value in data:
+        display_progress("Loading init data from input file to the ring nodes (through the first Node)", init_records, records_to_load)
+        SearchKeys.append(key)
+        load_record_to_node(key, value, node)
+        init_records += 1
+
+def worker(node, op, *args):
+    if op == 'join':
+        node.chordjoin(args[0])
+    elif op == 'lookup':
+        node.find_successor(args[0])
+    elif op == 'leave':
+        node.chordleave(AllNodes)
 
 # append str to a local statistics.csv file recording experimental
 # measurements of basic chord operations if print_statistics flag is set
@@ -345,19 +360,24 @@ def processSelection(selection, node):
     elif selection == 3:  # update an old pair (key/value)
         UpdatePair()
     elif selection == 4:  # exact match Query (Lookup)
-        ExactQuery()
+        with Pool(processes=32) as pool:
+            keys = random.sample(SearchKeys, min(5, len(SearchKeys)))
+            results = [pool.apply_async(worker, (node, 'lookup', key)) for key in keys]
+            for res in results:
+                res.get()
     elif selection == 5:  # Display Network configuration
-        if failure_recovery: fillSuccessorsList()
+        if failure_recovery:
+            fillSuccessorsList()
         DepictNetwork()
-        # for idx in SearchKeys:
-        #     ExactQueryCore(idx)
     elif selection == 6:  # a new node joins
         NewNodeJoins()
     elif selection == 7:  # Single Leave
-        init = False
-        SingleNodeLeave()
-    # elif selection == 8:  # Massive Leaves
-    #     MassiveNodeLeaves()
+        with Pool(processes=32) as pool:
+            nodes = random.sample(list(AllNodes.values()), min(5, len(AllNodes)))
+            results = [pool.apply_async(worker, (n, 'leave')) for n in nodes]
+            for res in results:
+                if res.get():
+                    del AllNodes[res.get().localAddress.to_string()]
     elif selection == 8:  # run auto benchmark
         autobenchmark()
 
