@@ -17,14 +17,7 @@ import graphviz
 import re
 from traceback import print_exc
 from datetime import datetime
-from multiprocessing import Process, Queue, Pool, Lock
-import multiprocessing as mp
-import logging
-
-logging.basicConfig(level=logging.INFO,
-                    format='%(asctime)s - %(levelname)s - %(message)s')
-logger = logging.getLogger(__name__)
-
+from multiprocessing import Process, Queue, Pool
 
 # Global variables
 m = 32                          # m bits of Chord ring
@@ -109,6 +102,7 @@ def load_data_process(filename, n, q):
 # Each record is being routed to a node using its identifier and successor(key)=node
 def load_file_on_the_ring(node, records_to_load):
     global input_file_name
+    global delimiter
     global data_records_to_be_read
     global init_records
     global SearchKeys
@@ -243,55 +237,40 @@ def DisplayNetworkC():
     for indx, node in AllNodes.items():
         node.printMyData()
 
-def add_node_process(ip, port, r):
-    loc_new_node_address = InetSocketAddress(ip, port)
-    loc_new_node = Node(loc_new_node_address, r, True)
-    AllNodes[loc_new_node_address.to_string()] = loc_new_node
-    loc_new_node.activate()
-    loc_new_node.chordjoin(AllNodes[node0_address.to_string()])
-    if r > 0:
-        loc_new_node.FillMySuccessors()
-
-
-def is_port_in_use(port):
-    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-        return s.connect_ex(('localhost', port)) == 0
-
-
 # add a new node to the Chord Ring notifying it whether r successor should be stored
 # if failure recovery is required by the user
-def add_node_process(ip, port, r):
-    try:
-        loc_new_node_address = InetSocketAddress(ip, port)
-        loc_new_node = Node(loc_new_node_address, r, True)
-        AllNodes[loc_new_node_address.to_string()] = loc_new_node
-        loc_new_node.activate()
-        loc_new_node.chordjoin(AllNodes[node0_address.to_string()])
-        if r > 0:
-            loc_new_node.FillMySuccessors()
-    except Exception as e:
-        logger.error(f"Error in add_node_process: {e}")
-
 def AddNewNode(init_phase):
+    global AllNodes
     global next_available_port
+    global pc_ip
+    global r
 
+    # check if the port is available
     while True:
-        port = next_available_port
-        next_available_port += 1  # 使用原子操作
-
-        if is_port_in_use(port):
-            continue
-        else:
+        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        try:
+            s.bind((pc_ip, next_available_port))
+            s.close()
             break
+        except:
+            next_available_port += 1
+            s.close()
+    loc_new_node_address = InetSocketAddress(pc_ip, next_available_port)
+    next_available_port += 1
+    loc_new_node = Node(loc_new_node_address, r, init_phase)
+    AllNodes[loc_new_node_address.to_string()] = loc_new_node
+    loc_new_node.activate()
 
-    p = mp.Process(target=add_node_process, args=(pc_ip, port, r))
-    p.start()
-    p.join(timeout=5)  # 等待子进程结束,最多等5秒
-    if p.is_alive():   # 如果5秒后子进程还在运行
-        logger.warning(f"Timeout waiting for add_node_process {port}, terminating...")
-        p.terminate()  # 强制终止子进程
-    time.sleep(0.1)
-    return p
+    start = time.process_time_ns()
+    loc_new_node.chordjoin(AllNodes[node0_address.to_string()])
+    end = time.process_time_ns()
+    elapsed_time = elapsed(end, start)
+    stat_str = f"{stat_id},AddNewNode,{len(AllNodes.items())},{elapsed_time}"
+    fprint("AddNewNode", elapsed_time)
+
+    if r>0:
+        loc_new_node.FillMySuccessors()
+        #loc_new_node.move_keys()
 
 # A new node will be created and is going to join the Chord Ring
 def NewNodeJoins():
@@ -392,24 +371,19 @@ def processSelection(selection, node):
     elif selection == 3:  # update an old pair (key/value)
         UpdatePair()
     elif selection == 4:  # exact match Query (Lookup)
-        with Pool(processes=32) as pool:
-            keys = random.sample(SearchKeys, min(5, len(SearchKeys)))
-            results = [pool.apply_async(worker, (node, 'lookup', key)) for key in keys]
-            for res in results:
-                res.get()
+        ExactQuery()
     elif selection == 5:  # Display Network configuration
-        if failure_recovery:
-            fillSuccessorsList()
+        if failure_recovery: fillSuccessorsList()
         DepictNetwork()
+        # for idx in SearchKeys:
+        #     ExactQueryCore(idx)
     elif selection == 6:  # a new node joins
         NewNodeJoins()
     elif selection == 7:  # Single Leave
-        with Pool(processes=32) as pool:
-            nodes = random.sample(list(AllNodes.values()), min(5, len(AllNodes)))
-            results = [pool.apply_async(worker, (n, 'leave')) for n in nodes]
-            for res in results:
-                if res.get():
-                    del AllNodes[res.get().localAddress.to_string()]
+        init = False
+        SingleNodeLeave()
+    # elif selection == 8:  # Massive Leaves
+    #     MassiveNodeLeaves()
     elif selection == 8:  # run auto benchmark
         autobenchmark()
 
@@ -495,30 +469,26 @@ if __name__ == "__main__":
     AllNodes = dict()
 
     #create initial node
+    # check if the port is available
+    while True:
+        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        try:
+            s.bind((pc_ip, next_available_port))
+            s.close()
+            break
+        except:
+            next_available_port += 1
+            s.close()
     node0_address = InetSocketAddress(pc_ip, next_available_port)
     next_available_port += 1
     new_node0 = Node(node0_address, r, True)
     AllNodes[node0_address.to_string()] = new_node0
     new_node0.activate()
 
-    lock = Lock()
-
     #create all the others nodes of the initial Chord ring congiguration
-    with mp.Pool(processes=32) as pool:
-        processes = []
     for i in range(1, n):
-        if len(mp.active_children()) >= 128:  # 如果当前子进程数超过128
-            logger.warning("Too many active processes, waiting...")
-            time.sleep(1)  # 等待1秒再检查
-        p = AddNewNode(True)
-        processes.append(p)
-        logger.info(f"Created node {i}/{n}")
-
-    for p in processes:
-        p.join(timeout=5)  # 等待所有子进程结束,每个最多等5秒
-        if p.is_alive():
-            logger.warning(f"Timeout waiting for node process, terminating...")
-            p.terminate()
+        AddNewNode(True)
+        display_progress("Creating initial configuration of the Chord ring", i, n)
 
     end1 = time.process_time_ns()
     print(f"\n\tInitial configuration of the Chord ring has been created in {elapsed(end1, start)} seconds.")
