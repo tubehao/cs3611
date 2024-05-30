@@ -2,7 +2,7 @@ import subprocess
 import time
 
 # 初始节点的端口号
-initial_port = 50000
+initial_port = 60000
 
 # 创建初始节点
 initial_process = subprocess.Popen(['python', 'Node.py', str(initial_port)])

@@ -116,11 +116,12 @@ class Node:
 
         if operation == "find_predecessor":
             # print("finding predecessor")
-            result = self.find_predecessor(int(args[0]))
+            result, pathLength = self.find_predecessor(int(args[0]))
+            result =  str(result)+"@"+str(pathLength)
 
         if operation == "find_successor":
             # print("finding successor")
-            result = self.find_successor(int(args[0]))
+            result, _ = self.find_successor(int(args[0]), False)
 
         if operation == "get_successor":
             # print("getting successor")
@@ -137,7 +138,6 @@ class Node:
         if operation == "notify":
             # print("notifiying")
             self.notify(int(args[0]),args[1],args[2])
-    
         # print(result)
         return str(result)
     def serve_requests(self, conn, addr):
@@ -157,6 +157,7 @@ class Node:
             # print('Sending', data)
             data = bytes(str(data), 'utf-8')
             conn.sendall(data)
+
     def start(self):
         # The start function creates 3 threads for each node:
         # On the 1st thread the stabilize function is being called repeatedly in a definite interval of time
@@ -175,14 +176,18 @@ class Node:
                 conn, addr = s.accept()
                 t = threading.Thread(target=self.serve_requests, args=(conn,addr))
                 t.start()   
-
+    def append_to_log(self, operation, node_info, key, value, message):
+        with open('log.txt', 'a') as log_file:
+            log_file.write(str(time.time()) + " , " + operation + " , " + str(node_info) + " , " + key + " ,pathLength:" + str(message) + '\n')
+    
     def insert_key(self,key,value):
 
         # The function to handle the incoming key_value pair insertion request from the client this function searches for the
         # correct node on which the key_value pair needs to be stored and then sends a message to that node to store the 
         # key_val pair in its data_store
         id_of_key = self.hash(str(key))
-        succ = self.find_successor(id_of_key)
+        succ, pathLength = self.find_successor(id_of_key, True)
+        self.append_to_log('insert', (self.nodeinfo.ip, self.nodeinfo.port), str(key), str(value), pathLength)
         # print("Succ found for inserting key" , id_of_key , succ)
         ip,port = self.get_ip_port(succ)
         self.request_handler.send_message(ip,port,"insert_server|" + str(key) + ":" + str(value) )
@@ -194,7 +199,9 @@ class Node:
         # correct node on which the key_value pair is stored and then sends a message to that node to delete the key_val
         # pair in its data_store.
         id_of_key = self.hash(str(key))
-        succ = self.find_successor(id_of_key)
+        succ, pathLength = self.find_successor(id_of_key, True)
+        self.append_to_log('insert', (self.nodeinfo.ip, self.nodeinfo.port), str(key), "True", pathLength)
+
         # print("Succ found for deleting key" , id_of_key , succ)
         ip,port = self.get_ip_port(succ)
         self.request_handler.send_message(ip,port,"delete_server|" + str(key) )
@@ -206,16 +213,20 @@ class Node:
         # correct node on which the key_value pair is stored and then sends a message to that node to return the value 
         # corresponding to that key.
         id_of_key = self.hash(str(key))
-        succ = self.find_successor(id_of_key)
+        succ, pathLength = self.find_successor(id_of_key, True)
+        self.append_to_log('insert', (self.nodeinfo.ip, self.nodeinfo.port), str(key), "True", pathLength)
+
         # print("Succ found for searching key" , id_of_key , succ)
         ip,port = self.get_ip_port(succ)
         data = self.request_handler.send_message(ip,port,"search_server|" + str(key) )
         return data
 
 
+
+
     def join_request_from_other_node(self, node_id):
         # will return successor for the node who is requesting to join
-        return self.find_successor(node_id)
+        return self.find_successor(node_id, False)[0]
 
     def join(self,node_ip, node_port):
     
@@ -224,6 +235,7 @@ class Node:
         # smaller than its id from its successor.
         data = 'join_request|' + str(self.id)
         succ = self.request_handler.send_message(node_ip,node_port,data)
+        # print("succ",succ)
         ip,port = self.get_ip_port(succ)
         self.successor = Node(ip,port)
         self.finger_table.table[0][1] = self.successor
@@ -243,36 +255,42 @@ class Node:
         # print("finding pred for id ", search_id)
         if self.predecessor is not None and  self.successor.id == self.id:
             # print("teri maa ki ankh"+self.nodeinfo.__str__())
-            return self.nodeinfo.__str__()
+            return self.nodeinfo.__str__(), 1
         if self.get_forward_distance(self.successor.id) > self.get_forward_distance(search_id):
             # print("yaar tu gandu hai kya"+self.nodeinfo.__str__())
-            return self.nodeinfo.__str__()
+            return self.nodeinfo.__str__(), 1
         else:
             new_node_hop = self.closest_preceding_node(search_id)
             # print("new node hop finding hops in find predecessor" , new_node_hop.nodeinfo.__str__() )
             if new_node_hop is None:
-                return "None"
+                return "None", 0
             ip, port = self.get_ip_port(new_node_hop.nodeinfo.__str__())
             if ip == self.ip and port == self.port:
-                return self.nodeinfo.__str__()
+                return self.nodeinfo.__str__(), 0
             data = self.request_handler.send_message(ip , port, "find_predecessor|"+str(search_id))
-            return data
+            print(data)
+            data = data.split('@')
+            return data[0], int(data[1]) + 1
 
-    def find_successor(self, search_id):
+    def find_successor(self, search_id, flag = False):
         
         # The find_successor function provides the successor of any value in the ring given its id.
         
         if(search_id == self.id):
-            return str(self.nodeinfo)
+            return str(self.nodeinfo), 1
         # print("finding succ for id ", search_id)
-        predecessor = self.find_predecessor(search_id)
+        predecessor, pathLength = self.find_predecessor(search_id)
+        # print("Path length", pathLength)
+        # print(flag)
+        # if (flag == True): print("Path length", pathLength)
         # print("predcessor found is ", predecessor)
         if(predecessor == "None"):
-            return "None"
+            return "None", 0
         ip,port = self.get_ip_port(predecessor)
         # print(ip ,port , "in find successor, data of predecesor")
         data = self.request_handler.send_message(ip , port, "get_successor")
-        return data
+        return data, pathLength
+
     def closest_preceding_node(self, search_id):
         closest_node = None
         min_distance = pow(2,m)+1
@@ -327,26 +345,26 @@ class Node:
                 self.successor = Node(ip,port)
                 self.finger_table.table[0][1] = self.successor
             self.request_handler.send_message(self.successor.ip , self.successor.port, "notify|"+ str(self.id) + "|" + self.nodeinfo.__str__())
-            print("===============================================")
-            print("STABILIZING")
-            print("===============================================")
-            print("ID: ", self.id)
-            if self.successor is not None:
-                print("Successor ID: " , self.successor.id)
-            if self.predecessor is not None:
-                print("predecessor ID: " , self.predecessor.id)
-            print("===============================================")
-            print("=============== FINGER TABLE ==================")
-            self.finger_table.print()
-            print("===============================================")
-            print("DATA STORE")
-            print("===============================================")
-            print(str(self.data_store.data))
-            print("===============================================")
-            print("+++++++++++++++ END +++++++++++++++++++++++++++")
-            print()
-            print()
-            print()
+            # print("===============================================")
+            # print("STABILIZING")
+            # print("===============================================")
+            # print("ID: ", self.id)
+            # if self.successor is not None:
+            #     print("Successor ID: " , self.successor.id)
+            # if self.predecessor is not None:
+            #     print("predecessor ID: " , self.predecessor.id)
+            # print("===============================================")
+            # print("=============== FINGER TABLE ==================")
+            # self.finger_table.print()
+            # print("===============================================")
+            # print("DATA STORE")
+            # print("===============================================")
+            # print(str(self.data_store.data))
+            # print("===============================================")
+            # print("+++++++++++++++ END +++++++++++++++++++++++++++")
+            # print()
+            # print()
+            # print()
             time.sleep(10)
 
     def notify(self, node_id , node_ip , node_port):
@@ -376,7 +394,7 @@ class Node:
             random_index = random.randint(1,m-1)
             finger = self.finger_table.table[random_index][0]
             # print("in fix fingers , fixing index", random_index)
-            data = self.find_successor(finger)
+            data, _ = self.find_successor(finger, False)
             if data == "None":
                 time.sleep(10)
                 continue
