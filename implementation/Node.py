@@ -46,18 +46,18 @@ class Node:
         self.finger_table = FingerTable(self.id)
         self.data_store = DataStore()
         self.request_handler = RequestHandler()
-    
+
     def hash(self, message):
         # This function is used to find the id of any string and hence find it's correct position in the ring
         digest = hashlib.sha256(message.encode()).hexdigest()
         digest = int(digest, 16) % pow(2,m)
         return digest
-    
+
     def process_requests(self, message):
-        
+
         # The process_requests function is used to manage the differnt requests coming to any node it checks the message
         # and then calls the required function accordingly
-        
+
         operation = message.split("|")[0]
         args = []
         if( len(message.split("|")) > 1):
@@ -65,7 +65,7 @@ class Node:
         result = "Done"
         if operation == 'insert_server':
             # print('Inserting in my datastore', str(self.nodeinfo))
-            data = message.split('|')[1].split(":") 
+            data = message.split('|')[1].split(":")
             key = data[0]
             value = data[1]
             self.data_store.insert(key, value)
@@ -84,14 +84,14 @@ class Node:
                 return self.data_store.data[data]
             else:
                 return "NOT FOUND"
-            
+
         if operation == "send_keys":
             id_of_joining_node = int(args[0])
             result = self.send_keys(id_of_joining_node)
 
         if operation == "insert":
             # print("finding hop to insert the key" , str(self.nodeinfo) )
-            data = message.split('|')[1].split(":") 
+            data = message.split('|')[1].split(":")
             key = data[0]
             value = data[1]
             result = self.insert_key(key,value)
@@ -107,9 +107,9 @@ class Node:
             # print('Seaching...')
             data = message.split('|')[1]
             result = self.search_key(data)
-        
-    
-        
+
+
+
         if operation == "join_request":
             # print("join request recv")
             result  = self.join_request_from_other_node(int(args[0]))
@@ -229,9 +229,9 @@ class Node:
         return self.find_successor(node_id, False)[0]
 
     def join(self,node_ip, node_port):
-    
+
         # this function is responsible to join any new nodes to the chord ring ,it finds out the successor and the predecessor of the
-        # new incoming node in the ring and then it sends a send_keys request to its successor to recieve all the keys 
+        # new incoming node in the ring and then it sends a send_keys request to its successor to recieve all the keys
         # smaller than its id from its successor.
         data = 'join_request|' + str(self.id)
         succ = self.request_handler.send_message(node_ip,node_port,data)
@@ -240,7 +240,7 @@ class Node:
         self.successor = Node(ip,port)
         self.finger_table.table[0][1] = self.successor
         self.predecessor = None
-        
+
         if self.successor.id != self.id:
             data = self.request_handler.send_message(self.successor.ip , self.successor.port, "send_keys|"+str(self.id))
             # print("data recieved" , data)
@@ -250,7 +250,6 @@ class Node:
                     self.data_store.data[key_value.split('|')[0]] = key_value.split('|')[1]
 
     def find_predecessor(self, search_id):
-
         # The find_predecessor function provides the predecessor of any value in the ring given its id.
         # print("finding pred for id ", search_id)
         if self.predecessor is not None and  self.successor.id == self.id:
@@ -267,10 +266,23 @@ class Node:
             ip, port = self.get_ip_port(new_node_hop.nodeinfo.__str__())
             if ip == self.ip and port == self.port:
                 return self.nodeinfo.__str__(), 0
-            data = self.request_handler.send_message(ip , port, "find_predecessor|"+str(search_id))
-            print(data)
-            data = data.split('@')
-            return data[0], int(data[1]) + 1
+
+            max_retries = 10
+            base_wait_time = 1
+
+            for attempt in range(max_retries):
+                data = self.request_handler.send_message(ip, port, "find_predecessor|" + str(search_id))
+                if data:
+                    data = data.split('@')
+                    if len(data) < 2:
+                        print(f"Unexpected data format: {data}")
+                        continue
+                    return data[0], int(data[1]) + 1
+                wait_time = base_wait_time * (2 ** attempt)
+                print(f"Attempt {attempt + 1} failed, retrying in {wait_time} seconds...")
+                time.sleep(wait_time)
+
+            return "None", 0
 
     def find_successor(self, search_id, flag = False):
         
@@ -474,18 +486,28 @@ class FingerTable:
 # the send_message function takes as the ip, port of the reciever and the message to be sent as the arguments and 
 # then sends the message to the desired node.
 class RequestHandler:
+
+    request_lock = threading.Lock()
     def __init__(self):
         pass
-    def send_message(self, ip, port, message):
-        s = socket.socket(socket.AF_INET,socket.SOCK_STREAM) 
-  
-        # connect to server on local computer 
-        s.connect((ip,port)) 
-        s.send(message.encode('utf-8')) 
-        data = s.recv(1024) 
-        s.close()
-        return data.decode("utf-8") 
-        
+    def send_message(self, ip, port, message, retries=10, backoff_factor=1.5):
+        with RequestHandler.request_lock:
+            attempt = 0
+            while attempt < retries:
+                try:
+                    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                    s.connect((ip, port))
+                    s.send(message.encode('utf-8'))
+                    data = s.recv(1024)
+                    s.close()
+                    return data.decode("utf-8")
+                except ConnectionRefusedError as e:
+                    print(f"Error checking port {port}: {e}")
+                    attempt += 1
+                    print(f"Attempt {attempt}: Connection to {ip}:{port} refused. Retrying in {backoff_factor ** attempt:.2f} seconds...")
+                    time.sleep(backoff_factor ** attempt)
+            print(f"Failed to connect to {ip}:{port} after {retries} attempts.")
+            return None
 
 # The ip = "127.0.0.1" signifies that the node is executing on the localhost
 
