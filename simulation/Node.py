@@ -573,6 +573,7 @@ def nodeMessageProcessor(ip, port, message):
 def addNode(port, ExistingNodePort):
     node = Node(ip, int(port))
     # print(hash(str(nodeInf(port, ip))) == node.id)
+    # print("111")
 
     if ring == {}:
         print("creating chord")
@@ -669,10 +670,20 @@ def display(node):
 
 
 if __name__ == "__main__":
-    node_count = 2
-
-    for i in range(node_count):
-        addNode(5000 + i, 5000 + i - 1)
+    import sys
+    sys.setrecursionlimit(2000)  # 设置最大递归深度为2000
+    node_count = 5
+    i = 5000
+    suc = 4999
+    num = 0
+    while num < node_count:
+        
+        if ring.get(hash(str(nodeInf(i, ip)))) == None:
+            addNode(i, suc)
+            print(num, i, suc)
+            suc+=1
+            num+=1
+        i+=1
 
 
     while(True):
