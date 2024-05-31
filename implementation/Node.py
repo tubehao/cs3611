@@ -357,26 +357,26 @@ class Node:
                 self.successor = Node(ip,port)
                 self.finger_table.table[0][1] = self.successor
             self.request_handler.send_message(self.successor.ip , self.successor.port, "notify|"+ str(self.id) + "|" + self.nodeinfo.__str__())
-            # print("===============================================")
-            # print("STABILIZING")
-            # print("===============================================")
-            # print("ID: ", self.id)
-            # if self.successor is not None:
-            #     print("Successor ID: " , self.successor.id)
-            # if self.predecessor is not None:
-            #     print("predecessor ID: " , self.predecessor.id)
-            # print("===============================================")
-            # print("=============== FINGER TABLE ==================")
-            # self.finger_table.print()
-            # print("===============================================")
-            # print("DATA STORE")
-            # print("===============================================")
-            # print(str(self.data_store.data))
-            # print("===============================================")
-            # print("+++++++++++++++ END +++++++++++++++++++++++++++")
-            # print()
-            # print()
-            # print()
+            print("===============================================")
+            print("STABILIZING")
+            print("===============================================")
+            print("ID: ", self.id)
+            if self.successor is not None:
+                print("Successor ID: " , self.successor.id)
+            if self.predecessor is not None:
+                print("predecessor ID: " , self.predecessor.id)
+            print("===============================================")
+            print("=============== FINGER TABLE ==================")
+            self.finger_table.print()
+            print("===============================================")
+            print("DATA STORE")
+            print("===============================================")
+            print(str(self.data_store.data))
+            print("===============================================")
+            print("+++++++++++++++ END +++++++++++++++++++++++++++")
+            print()
+            print()
+            print()
             time.sleep(10)
 
     def notify(self, node_id , node_ip , node_port):
@@ -491,23 +491,25 @@ class RequestHandler:
     def __init__(self):
         pass
     def send_message(self, ip, port, message, retries=10, backoff_factor=1.5):
-        with RequestHandler.request_lock:
-            attempt = 0
-            while attempt < retries:
-                try:
-                    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-                    s.connect((ip, port))
-                    s.send(message.encode('utf-8'))
-                    data = s.recv(1024)
+        attempt = 0
+        s = None
+        while attempt < retries:
+            try:
+                s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                s.connect((ip, port))
+                s.send(message.encode('utf-8'))
+                data = s.recv(1024)
+                return data.decode("utf-8")
+            except ConnectionRefusedError as e:
+                print(f"Error checking port {port}: {e}")
+                attempt += 1
+                print(f"Attempt {attempt}: Connection to {ip}:{port} refused. Retrying in {backoff_factor ** attempt:.2f} seconds...")
+                time.sleep(backoff_factor ** attempt)
+            finally:
+                if s is not None:
                     s.close()
-                    return data.decode("utf-8")
-                except ConnectionRefusedError as e:
-                    print(f"Error checking port {port}: {e}")
-                    attempt += 1
-                    print(f"Attempt {attempt}: Connection to {ip}:{port} refused. Retrying in {backoff_factor ** attempt:.2f} seconds...")
-                    time.sleep(backoff_factor ** attempt)
-            print(f"Failed to connect to {ip}:{port} after {retries} attempts.")
-            return None
+        print(f"Failed to connect to {ip}:{port} after {retries} attempts.")
+        return None
 
 # The ip = "127.0.0.1" signifies that the node is executing on the localhost
 

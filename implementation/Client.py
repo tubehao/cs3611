@@ -1,5 +1,8 @@
 import socket
 
+RETRY_TIMES = 5
+TIMEOUT = 5
+
 def main():
 	#ip = input("Give the ip address of a node")
 	ip = "127.0.0.1"

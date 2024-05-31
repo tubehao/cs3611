@@ -4,11 +4,20 @@ import time
 import hashlib
 import random
 import sys
-from utils import hash
 from copy import deepcopy
-
-
+import sys
+ring = {}
 m = 7
+ip = "127.0.0.1"
+def nodeInf(port, ip = "127.0.0.1"):
+    return ip + "|" + str(port) 
+
+def hash(message):
+    digest = hashlib.sha256(message.encode()).hexdigest()
+    digest = int(digest, 16) % pow(2, m)
+    return digest 
+
+
 # The class DataStore is used to store the key value pairs at each node
 
 class DataStore:
@@ -20,7 +29,6 @@ class DataStore:
         del self.data[key]
     def search(self, search_key):
         # print('Search key', search_key)
-        
         if search_key in self.data:
             return self.data[search_key]
         else:
@@ -367,26 +375,26 @@ class Node:
                 self.successor = Node(ip,port)
                 self.finger_table.table[0][1] = self.successor
             self.request_handler.send_message(self.successor.ip , self.successor.port, "notify|"+ str(self.id) + "|" + self.nodeinfo.__str__())
-            print("===============================================")
-            print("STABILIZING")
-            print("===============================================")
-            print("ID: ", self.id)
-            if self.successor is not None:
-                print("Successor ID: " , self.successor.id)
-            if self.predecessor is not None:
-                print("predecessor ID: " , self.predecessor.id)
-            print("===============================================")
-            print("=============== FINGER TABLE ==================")
-            self.finger_table.print()
-            print("===============================================")
-            print("DATA STORE")
-            print("===============================================")
-            print(str(self.data_store.data))
-            print("===============================================")
-            print("+++++++++++++++ END +++++++++++++++++++++++++++")
-            print()
-            print()
-            print()
+            # print("===============================================")
+            # print("STABILIZING")
+            # print("===============================================")
+            # print("ID: ", self.id)
+            # if self.successor is not None:
+            #     print("Successor ID: " , self.successor.id)
+            # if self.predecessor is not None:
+            #     print("predecessor ID: " , self.predecessor.id)
+            # print("===============================================")
+            # print("=============== FINGER TABLE ==================")
+            # self.finger_table.print()
+            # print("===============================================")
+            # print("DATA STORE")
+            # print("===============================================")
+            # print(str(self.data_store.data))
+            # print("===============================================")
+            # print("+++++++++++++++ END +++++++++++++++++++++++++++")
+            # print()
+            # print()
+            # print()
 
     def notify(self, node_id , node_ip , node_port):
         # Recevies notification from stabilized function when there is change in successor
@@ -471,7 +479,7 @@ class Node:
     def get_forward_distance_2nodes(self,node2,node1):
         return pow(2,m) - self.get_backward_distance_2nodes(node2,node1)
 
-    def leave():
+    def leave(self):
         self.exist = False
 # The class FingerTable is responsible for managing the finger table of each node.
 class FingerTable:
@@ -498,12 +506,9 @@ class FingerTable:
 # then sends the message to the desired node.
 class RequestHandler:
 
-    request_lock = threading.Lock()
     def __init__(self):
         pass
     def send_message(self, ip, port, message, retries=10, backoff_factor=1.5):
-        from utils import nodeMessageProcessor
-
         # attempt = 0
         # s = None
         # while attempt < retries:
@@ -526,131 +531,152 @@ class RequestHandler:
         return nodeMessageProcessor(ip, port, message)
 
 
-# class Chord:
-#     def __init__(self):
+def nodeMessageProcessor(ip, port, message):
+    # from chord import Chord
+    # print(ring)
+    # print(hash(str(nodeInf(port, ip))))
+    receiveNode = ring[hash(str(nodeInf(port, ip)))]
+    response = receiveNode.serve_requests(message)
+    return response
 
-#         self.ring = {}
+def addNode(port, ExistingNodePort):
+    node = Node(ip, int(port))
+    # print(hash(str(nodeInf(port, ip))) == node.id)
 
-#     def addNode(self, port, ExistingNodePort):
-#         node = Node.Node(ip, int(port))
-#         # print(hash(str(nodeInf(port, ip))) == node.id)
+    if ring == {}:
+        print("creating chord")
+        ring[node.id] = node
+        node.predecessor = node
+        node.successor = node
 
-#         if self.ring == {}:
-#             print("creating chord")
-#             self.ring[node.id] = Node.Node(ip, port)
-#             node.predecessor = Node.Node(ip,node.port)
-#             node.successor = Node.Node(ip,node.port)
+        node.finger_table.table[0][1] = node
+        node.start()
+        print("Node added to chord")
+        # print(ring)
+        return
+    elif ring.get(hash(nodeInf(ExistingNodePort))) == None:
+        print("Existing node does not exist")
+        return
+    elif ring.get(hash(nodeInf(port))) == None:
+        node.join(ip, ExistingNodePort)
+        node.start()
+        ring[node.id] = node
+        print("Node added to chord")
+        return
+    else :
+        print("Node already exists")
+        return
 
-#             node.finger_table.table[0][1] = node
-#             node.start()
-#             print("Node added to chord")
-#             # print(self.ring)
-#             return
-#         elif self.ring.get(self.hash(nodeInf(ExistingNodePort))) == None:
-#             print("Existing node does not exist")
-#             return
-#         elif self.ring.get(self.hash(nodeInf(port))) == None:
-#             node.join(ip, ExistingNodePort)
-#             node.start()
-#             self.ring[node.id] = node
-#             print("Node added to chord")
-#             return
-#         else :
-#             print("Node already exists")
-#             return
+def deleteNode(port):
+    leavingNode = ring[hash(str(nodeInf(port)))]
+    if leavingNode == None:
+        print("Node does not exist")
+        return
+    leavingNode.leave()
+    del ring[hash(str(nodeInf(port)))]
 
-#     def deleteNode(self, port):
-#         leavingNode = self.ring[hash(nodeInf(port))]
-#         leavingNode.leave()
-#         del self.ring[hash(str(nodeInf(port)))]
-    
-#     def leaveChord():
-#         for node in self.ring.values():
-#             node.leave()
+# def leaveChord():
+#     for node in ring.values():
+#         node.leave()
 
-#     def enterNode(self, port, ip = "127.0.0.1"):
-#         nodeId = hash(str(nodeInf(port, ip)))
-#         if self.ring.get(nodeId) == None:
-#             print("Node does not exist")
-#             return
-#         else:
-#             node = self.ring[nodeId]
-#             self.display(node)
-#             return
+def enterNode(port, ip = "127.0.0.1"):
+    nodeId = hash(str(nodeInf(port, ip)))
+    if ring.get(nodeId) == None:
+        print("Node does not exist")
+        return
+    else:
+        node = ring[nodeId]
+        # print(nodeId)
+        display(node)
+        return
 
-#     def display(self, node):
-#         print("Node id : ", node.id)
-#         print("Node ip : ", node.ip)
-#         print("Node port : ", node.port)
-#         print("Node predecessor : ", node.predecessor.id)
-#         print("Node successor : ", node.successor.id)
-#         print("Node finger table : ", node.finger_table.table)
-#         while(True):
-#             print("************************MENU*************************")
-#             print("PRESS ***********************************************")
-#             print("1. TO ENTER *****************************************")
-#             print("2. TO SHOW ******************************************")
-#             print("3. TO DELTE *****************************************")
-#             print("0. TO EXIT ******************************************")
-#             print("*****************************************************")
-#             choice = input()
-
-
-#             if(choice == '1'):
-#                 key = input("ENTER THE KEY : ")
-#                 val = input("ENTER THE VALUE : ")
-#                 message = "insert|" + str(key) + ":" + str(val)
-                
-#                 data = nodeMessageProcessor(node, node.ip, node.port, message)
-#                 print(data)
-
-#             elif(choice == '2'):
-#                 key = input("ENTER THE KEY")
-#                 message = "search|" + str(key)
-#                 data = nodeMessageProcessor(node, node.ip, node.port, message)
-                
-#                 print("The value corresponding to the key is : ",data)
-
-#             elif(choice == '3'):
-#                 key = input("ENTER THE KEY")
-#                 message = "delete|" + str(key)
-#                 data = nodeMessageProcessor(node, node.ip, node.port, message)
-#                 print(data)
-
-#             elif(choice == '0'):
-#                 print("Exiting Node")
-#                 exit()
-                
-#             else:
-#                 print("INCORRECT CHOICE")
-
-#     def sendMessagefromChord(self, port, message):
-#         node = self.ring[hash(str(nodeInf(port)))]
-#         response = node.serve_requests(message)
-#         return response
+def display(node):
+    print("Node id : ", node.id)
+    print("Node ip : ", node.ip)
+    print("Node port : ", node.port)
+    print("Node finger table : ", node.finger_table.table)
+    while(True):
+        print("************************MENU*************************")
+        print("PRESS ***********************************************")
+        print("1. TO ENTER *****************************************")
+        print("2. TO SHOW ******************************************")
+        print("3. TO DELTE *****************************************")
+        print("0. TO EXIT ******************************************")
+        print("*****************************************************")
+        choice = input()
 
 
+        if(choice == '1'):
+            key = input("ENTER THE KEY : ")
+            val = input("ENTER THE VALUE : ")
+            message = "insert|" + str(key) + ":" + str(val)
+            
+            data = nodeMessageProcessor(node.ip, node.port, message)
+            print(data)
+
+        elif(choice == '2'):
+            key = input("ENTER THE KEY")
+            message = "search|" + str(key)
+            data = nodeMessageProcessor(node.ip, node.port, message)
+            
+            print("The value corresponding to the key is : ",data)
+
+        elif(choice == '3'):
+            key = input("ENTER THE KEY")
+            message = "delete|" + str(key)
+            data = nodeMessageProcessor(node.ip, node.port, message)
+            print(data)
+
+        elif(choice == '0'):
+            print("Exiting Node")
+            break
+            
+        else:
+            print("INCORRECT CHOICE")
 
 
-# The ip = "127.0.0.1" signifies that the node is executing on the localhost
 
-ip = "127.0.0.1"
-# This if statement is used to check if the node joining is the first node of the ring or not
+if __name__ == "__main__":
+    node_count = 5
 
-if len(sys.argv) == 3:
-    print("JOINING RING")
-    # print(sys.argv)
-    node = Node(ip, int(sys.argv[1]))
+    for i in range(node_count):
+        addNode(5000 + i, 5000 + i - 1)
 
-    node.join(ip,int(sys.argv[2]))
-    node.start()
 
-if len(sys.argv) == 2:
-    print("CREATING RING")
-    # print(sys.argv)
-    node = Node(ip, int(sys.argv[1]))
+    while(True):
+        # print(ring)
+        print("************************MENU*************************")
+        print("PRESS ***********************************************")
+        print("1. Add a node *****************************************")
+        print("2. Delete a node ******************************************")
+        print("3. Enter a node *****************************************")
+        print("0. EXIT ******************************************")
+        print("*****************************************************")
+        choice = input()
 
-    node.predecessor = Node(ip,node.port)
-    node.successor = Node(ip,node.port)
-    node.finger_table.table[0][1] = node
-    node.start()
+        if(choice == '1'):
+            port = input("ENTER THE port : ")
+            ExistingNodePort = None
+            if ring != {}:
+                ExistingNodePort = input("ENTER THE EXISTING NODE PORT (if any): ")
+            addNode(port, ExistingNodePort)
+            # print(f"Add node id {id} to the chord")
+            continue
+
+        elif(choice == '2'):
+            port = input("ENTER THE port : ")
+            deleteNode(port)
+            print(f"Node with port {port} has been deleted")
+            continue
+
+        elif(choice == '3'):
+            enterNode(input("ENTER THE port : "))
+            continue
+
+        elif(choice == '0'):
+            print("bye~")
+            exit()
+            
+        else:
+            print("INCORRECT CHOICE")
+            continue
