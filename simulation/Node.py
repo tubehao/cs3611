@@ -253,9 +253,11 @@ class Node:
         succ = self.request_handler.send_message(node_ip,node_port,data)
         # print("succ",succ)
         ip,port = self.get_ip_port(succ)
-        self.successor = Node(ip,port)
+        # self.successor = Node(ip,port)!!!
+        self.successor = ring[hash(str(nodeInf(port, ip)))]
         self.finger_table.table[0][1] = self.successor
-        self.predecessor = None
+        self.predecessor = self.successor.predecessor
+        self.predecessor.successor = ring[self.id]
 
         if self.successor.id != self.id:
             data = self.request_handler.send_message(self.successor.ip , self.successor.port, "send_keys|"+str(self.id))
@@ -271,7 +273,7 @@ class Node:
         if self.predecessor is not None and  self.successor.id == self.id:
             # print("teri maa ki ankh"+self.nodeinfo.__str__())
             return self.nodeinfo.__str__(), 1
-        if self.get_forward_distance(self.successor.id) > self.get_forward_distance(search_id):
+        if self.get_forward_distance(self.successor.id) > self.get_forward_distance(search_id):  # 当前节点在后面比当前节点的后继在后面的少
             # print("yaar tu gandu hai kya"+self.nodeinfo.__str__())
             return self.nodeinfo.__str__(), 1
         else:
@@ -337,6 +339,7 @@ class Node:
         # print(id_of_joining_node , "Asking for keys")
         data = ""
         keys_to_be_removed = []
+        self.predecessor = ring[id_of_joining_node]
         for keys in self.data_store.data:
             key_id = hash(str(keys))
             if self.get_forward_distance_2nodes(key_id , id_of_joining_node) < self.get_forward_distance_2nodes(key_id,self.id):
@@ -354,7 +357,8 @@ class Node:
         # is able to gather information of new nodes joining the ring. 
         while self.exist:
             time.sleep(10)
-
+            if self.exist == False:
+                break
             if self.successor is None:
                 time.sleep(10)
                 continue
@@ -362,17 +366,18 @@ class Node:
 
             if self.successor.ip == self.ip  and self.successor.port == self.port:
                 time.sleep(10)
+            # print(self.id, self.successor.id, "stabilizing")
             result = self.request_handler.send_message(self.successor.ip , self.successor.port , data)
-            if result == "None" or len(result) == 0:
+            if result == "None" or result == None or len(result) == 0:
                 self.request_handler.send_message(self.successor.ip , self.successor.port, "notify|"+ str(self.id) + "|" + self.nodeinfo.__str__())
                 continue
 
             # print("found predecessor of my sucessor", result, self.successor.id)
-            ip , port = self.get_ip_port(result)
+            ip, port = self.get_ip_port(result)
             result = int(self.request_handler.send_message(ip,port,"get_id"))
             if self.get_backward_distance(result) > self.get_backward_distance(self.successor.id):
                 # print("changing my succ in stablaize", result)
-                self.successor = Node(ip,port)
+                self.successor = ring[hash(str(nodeInf(port, ip)))]
                 self.finger_table.table[0][1] = self.successor
             self.request_handler.send_message(self.successor.ip , self.successor.port, "notify|"+ str(self.id) + "|" + self.nodeinfo.__str__())
             # print("===============================================")
@@ -403,15 +408,18 @@ class Node:
             if self.get_backward_distance(node_id) < self.get_backward_distance(self.predecessor.id):
                 # print("someone notified me")
                 # print("changing my pred", node_id)
-                self.predecessor = Node(node_ip,int(node_port))
+                # self.predecessor = Node(node_ip,int(node_port))
+                self.predecessor = ring[hash(str(nodeInf(node_port, node_ip)))]
                 return
         if self.predecessor is None or self.predecessor == "None" or ( node_id > self.predecessor.id and node_id < self.id ) or ( self.id == self.predecessor.id and node_id != self.id) :
             # print("someone notified me")
             # print("changing my pred", node_id)
-            self.predecessor = Node(node_ip,int(node_port))
+            # self.predecessor = Node(node_ip,int(node_port))
+            self.predecessor = ring[hash(str(nodeInf(node_port, node_ip)))]
             if self.id == self.successor.id:
                 # print("changing my succ", node_id)
-                self.successor = Node(node_ip,int(node_port))
+                # self.successor = Node(node_ip,int(node_port))
+                self.successor = ring[hash(str(nodeInf(node_port, node_ip)))]
                 self.finger_table.table[0][1] = self.successor
         
     def fix_fingers(self):
@@ -419,7 +427,9 @@ class Node:
         # 10 seconds and then picks one random index of the table and corrects it so that if any new node has joined the 
         # ring it can properly mark that node in its finger table.
         while self.exist:
-            time.sleep(10)
+            time.sleep(5)
+            if self.exist == False:
+                break
             random_index = random.randint(1,m-1)
             finger = self.finger_table.table[random_index][0]
             # print("in fix fingers , fixing index", random_index)
@@ -427,8 +437,11 @@ class Node:
             if data == "None":
                 time.sleep(10)
                 continue
-            ip,port = self.get_ip_port(data)
-            self.finger_table.table[random_index][1] = Node(ip,port) 
+            ip, port = self.get_ip_port(data)
+            # self.finger_table.table[random_index][1] = Node(ip,port) !!!
+            if ring.get(hash(str(nodeInf(port, ip))) ) != None:
+                self.finger_table.table[random_index][1] = ring[hash(str(nodeInf(port, ip)))]
+
             
     def get_successor(self):
         # This function is used to return the successor of the node
@@ -481,6 +494,20 @@ class Node:
 
     def leave(self):
         self.exist = False
+        print(self.predecessor.port, self.successor.port, "leaving")
+        if self.predecessor is not None:
+            self.predecessor.successor = self.successor
+            self.predecessor.finger_table.table[0][1] = self.successor
+        self.successor.predecessor = self.predecessor
+        print(self.predecessor.id, self.successor.id)
+
+
+        #pass key to successor
+        for key in sorted(self.data_store.data.keys()):
+            # self.successor.data[key] = self.data[key]
+            self.successor.data_store.insert(key, self.data_store.data[key])
+            print(key)
+
 # The class FingerTable is responsible for managing the finger table of each node.
 class FingerTable:
     # The __init__ fucntion is used to initialize the table with values when 
@@ -535,6 +562,10 @@ def nodeMessageProcessor(ip, port, message):
     # from chord import Chord
     # print(ring)
     # print(hash(str(nodeInf(port, ip))))
+    # print(message)
+    if ring.get(hash(str(nodeInf(port, ip))) ) == None:
+        print("Node does not exist")
+        return None
     receiveNode = ring[hash(str(nodeInf(port, ip)))]
     response = receiveNode.serve_requests(message)
     return response
@@ -558,9 +589,10 @@ def addNode(port, ExistingNodePort):
         print("Existing node does not exist")
         return
     elif ring.get(hash(nodeInf(port))) == None:
+        ring[node.id] = node
+
         node.join(ip, ExistingNodePort)
         node.start()
-        ring[node.id] = node
         print("Node added to chord")
         return
     else :
@@ -637,7 +669,7 @@ def display(node):
 
 
 if __name__ == "__main__":
-    node_count = 5
+    node_count = 2
 
     for i in range(node_count):
         addNode(5000 + i, 5000 + i - 1)
