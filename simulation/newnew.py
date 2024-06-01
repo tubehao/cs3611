@@ -9,13 +9,23 @@ import sys
 ring = {}
 m = 11
 ip = "127.0.0.1"
+node_count = 1000
+
 def nodeInf(port, ip = "127.0.0.1"):
     return ip + "|" + str(port) 
 
-def hash(message):
+def node_hash(port):
+    # 计算节点的哈希值
+    message = nodeInf(port, ip)
     digest = hashlib.sha256(message.encode()).hexdigest()
     digest = int(digest, 16) % pow(2, m)
+    return digest
+
+def hash(message):
+    digest = hashlib.sha256(message.encode()).hexdigest()
+    digest = int(digest, 16) % pow(2, 11)  # 修改为pow(2, 11)
     return digest 
+
 
 
 # The class DataStore is used to store the key value pairs at each node
@@ -49,7 +59,7 @@ class Node:
         self.ip = ip
         self.port = int(port)
         self.nodeinfo = NodeInfo(ip, port)
-        self.id = hash(str(self.nodeinfo))
+        self.id = node_hash(port)
         # print(self.id)
         self.predecessor = None
         self.successor = None
@@ -64,7 +74,6 @@ class Node:
         digest = hashlib.sha256(message.encode()).hexdigest()
         digest = int(digest, 16) % pow(2,m)
         return digest
-
     def process_requests(self, message):
 
         # The process_requests function is used to manage the differnt requests coming to any node it checks the message
@@ -152,53 +161,30 @@ class Node:
             self.notify(int(args[0]),args[1],args[2])
         # print(result)
         return str(result)
-    # def serve_requests(self, conn, addr):
-        
-        # The serve_requests fucntion is used to listen to incoming requests on the open port and then reply to them, it 
-        # takes as arguments the connection and the address of the connected device. 
-        
-        # with conn:
-        #     # print('Connected by', addr)
-            
-        #     data = conn.recv(1024)
-            
-        #     data = str(data.decode('utf-8'))
-        #     data = data.strip('\n')
-        #     # print(data)
-        #     data = self.process_requests(data)
-        #     # print('Sending', data)
-        #     data = bytes(str(data), 'utf-8')
-        #     conn.sendall(data)
+
     def serve_requests(self, message):
         message = message.strip('\n')
         data = self.process_requests(message)
         return data
 
+
     def start(self):
-        pass
         # The start function creates 3 threads for each node:
         # On the 1st thread the stabilize function is being called repeatedly in a definite interval of time
         # On the 2nd thread the fix_fingers function is being called repeatedly in a definite interval of time
         # and on the 3rd thread the serve_requests function is running which is continously listening for any new
         # incoming requests
-        # thread_for_stabalize = threading.Thread(target = self.stabilize)
-        # thread_for_stabalize.start()
-        # thread_for_fix_finger = threading.Thread(target=  self.fix_fingers)
-        # thread_for_fix_finger.start()
-        # with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-        #     s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        #     s.bind((self.nodeinfo.ip, self.nodeinfo.port))
-        #     s.listen()
-        #     while True:
-        #         conn, addr = s.accept()
-        #         t = threading.Thread(target=self.serve_requests, args=(conn,addr))
-        #         t.start()   
+        thread_for_stabalize = threading.Thread(target = self.stabilize)
+        thread_for_stabalize.start()
+        thread_for_fix_finger = threading.Thread(target=  self.fix_fingers)
+        thread_for_fix_finger.start()
+        pass
+
     def append_to_log(self, operation, node_info, key, value, message):
         with open('log.txt', 'a') as log_file:
             log_file.write(str(time.time()) + " , " + operation + " , " + str(node_info) + " , " + key + " ,pathLength:" + str(message) + '\n')
     
-    def insert_key(self,key,value):
-
+    def insert_key(self, key, value):
         # The function to handle the incoming key_value pair insertion request from the client this function searches for the
         # correct node on which the key_value pair needs to be stored and then sends a message to that node to store the 
         # key_val pair in its data_store
@@ -206,37 +192,64 @@ class Node:
         succ, pathLength = self.find_successor(id_of_key, True)
         self.append_to_log('insert', (self.nodeinfo.ip, self.nodeinfo.port), str(key), str(value), pathLength)
         # print("Succ found for inserting key" , id_of_key , succ)
-        ip,port = self.get_ip_port(succ)
-        self.request_handler.send_message(ip,port,"insert_server|" + str(key) + ":" + str(value) )
-        return "Inserted at node id " + str(Node(ip,port).id) + " key was " + str(key) + " key hash was " + str(id_of_key)  
-
-    def delete_key(self,key):
+        ip, port = self.get_ip_port(succ)
         
+        # 直接从ring中查找对应的节点
+        node = ring.get(node_hash(port))
+        if node:
+            # 调用节点的data_store.insert方法插入键值对
+            node.data_store.insert(str(key), str(value))
+        else:
+            print(f"Node {ip}:{port} not found in the ring")
+        
+        return "Inserted at node id " + str(Node(ip, port).id) + " key was " + str(key) + " key hash was " + str(id_of_key)
+
+    def delete_key(self, key):
         # The function to handle the incoming key_value pair deletion request from the client this function searches for the
         # correct node on which the key_value pair is stored and then sends a message to that node to delete the key_val
         # pair in its data_store.
         id_of_key = hash(str(key))
         succ, pathLength = self.find_successor(id_of_key, True)
-        self.append_to_log('insert', (self.nodeinfo.ip, self.nodeinfo.port), str(key), "True", pathLength)
+        self.append_to_log('delete', (self.nodeinfo.ip, self.nodeinfo.port), str(key), "True", pathLength)
 
         # print("Succ found for deleting key" , id_of_key , succ)
-        ip,port = self.get_ip_port(succ)
-        self.request_handler.send_message(ip,port,"delete_server|" + str(key) )
-        return "deleted at node id " + str(Node(ip,port).id) + " key was " + str(key) + " key hash was " + str(id_of_key)
+        ip, port = self.get_ip_port(succ)
+        
+        # 直接从ring中查找对应的节点
+        node = ring.get(node_hash(port))
+        if node:
+            # 调用节点的data_store.delete方法删除键值对
+            node.data_store.delete(str(key))
+        else:
+            print(f"Node {ip}:{port} not found in the ring")
+        
+        return "deleted at node id " + str(Node(ip, port).id) + " key was " + str(key) + " key hash was " + str(id_of_key)
 
 
-    def search_key(self,key):
+    def search_key(self, key):
         # The function to handle the incoming key_value pair search request from the client this function searches for the
         # correct node on which the key_value pair is stored and then sends a message to that node to return the value 
         # corresponding to that key.
         id_of_key = hash(str(key))
         succ, pathLength = self.find_successor(id_of_key, True)
-        self.append_to_log('insert', (self.nodeinfo.ip, self.nodeinfo.port), str(key), "True", pathLength)
+        self.append_to_log('search', (self.nodeinfo.ip, self.nodeinfo.port), str(key), "True", pathLength)
 
         # print("Succ found for searching key" , id_of_key , succ)
-        ip,port = self.get_ip_port(succ)
-        data = self.request_handler.send_message(ip,port,"search_server|" + str(key) )
-        return data
+        ip, port = self.get_ip_port(succ)
+        
+        # 直接从ring中查找对应的节点
+        node = ring.get(node_hash(port))
+        if node:
+            # 调用节点的data_store.search方法查找键值对
+            data = node.data_store.search(str(key))
+            print(node.id)
+            if data:
+                return data
+            else:
+                return "Key not found"
+        else:
+            print(f"Node {ip}:{port} not found in the ring")
+            return "Node not found"
 
 
 
@@ -245,82 +258,102 @@ class Node:
         # will return successor for the node who is requesting to join
         return self.find_successor(node_id, False)[0]
 
-    def join(self,node_ip, node_port):
-
+    def join(self, node_ip, node_port):
         # this function is responsible to join any new nodes to the chord ring ,it finds out the successor and the predecessor of the
         # new incoming node in the ring and then it sends a send_keys request to its successor to recieve all the keys
         # smaller than its id from its successor.
-        data = 'join_request|' + str(self.id)
-        succ = self.request_handler.send_message(node_ip,node_port,data)
-        # print("succ",succ)
-        ip,port = self.get_ip_port(succ)
-        # self.successor = Node(ip,port)!!!
-        self.successor = ring[hash(str(nodeInf(port, ip)))]
+        
+        # 直接从ring中查找对应的节点
+        node = ring.get(node_hash(node_port))
+        if node:
+            # 调用节点的join_request_from_other_node方法获取后继
+            succ = node.join_request_from_other_node(self.id)
+        else:
+            print(f"Node {node_ip}:{node_port} not found in the ring")
+            return
+        ip, port = self.get_ip_port(succ)
+        self.successor = ring[node_hash(port)]
         self.finger_table.table[0][1] = self.successor
-        self.predecessor = self.successor.predecessor
-        self.predecessor.successor = ring[self.id]
+        if self.predecessor is not None:
+            self.predecessor = self.successor.predecessor
+            self.predecessor.successor = ring[self.id]
 
         if self.successor.id != self.id:
-            data = self.request_handler.send_message(self.successor.ip , self.successor.port, "send_keys|"+str(self.id))
+            # 直接调用后继节点的send_keys方法获取键
+            data = self.successor.send_keys(self.id)
             # print("data recieved" , data)
             for key_value in data.split(':'):
                 if len(key_value) > 1:
                     # print(key_value.split('|'))
                     self.data_store.data[key_value.split('|')[0]] = key_value.split('|')[1]
+        # 通知其他节点更新后继和前驱
+        self.successor.notify(self.id, self.ip, self.port)
+        if self.predecessor is not None:
+            self.predecessor.notify(self.id, self.ip, self.port)
+
 
     def find_predecessor(self, search_id):
         # The find_predecessor function provides the predecessor of any value in the ring given its id.
         # print("finding pred for id ", search_id)
-        if self.predecessor is not None and  self.successor.id == self.id:
-            # print("teri maa ki ankh"+self.nodeinfo.__str__())
+        if self.predecessor is None and self.successor.id == self.id:
+            # 环中只有一个节点,前驱和后继都是自身
             return self.nodeinfo.__str__(), 1
-        if self.get_forward_distance(self.successor.id) > self.get_forward_distance(search_id):  # 当前节点在后面比当前节点的后继在后面的少
-            # print("yaar tu gandu hai kya"+self.nodeinfo.__str__())
-            return self.nodeinfo.__str__(), 1
-        else:
-            new_node_hop = self.closest_preceding_node(search_id)
-            # print("new node hop finding hops in find predecessor" , new_node_hop.nodeinfo.__str__() )
+        
+        current_node = self
+        path_length = 0
+        
+        while True:
+            if current_node.get_forward_distance(search_id) < current_node.get_forward_distance(current_node.successor.id):
+                # search_id在当前节点和后继之间,当前节点就是要找的前驱
+                return current_node.nodeinfo.__str__(), path_length
+            
+            new_node_hop = current_node.closest_preceding_node(search_id)
             if new_node_hop is None:
-                return "None", 0
-            ip, port = self.get_ip_port(new_node_hop.nodeinfo.__str__())
-            if ip == self.ip and port == self.port:
-                return self.nodeinfo.__str__(), 0
-
-            max_retries = 10
-            base_wait_time = 1
-
-            for attempt in range(max_retries):
-                data = self.request_handler.send_message(ip, port, "find_predecessor|" + str(search_id))
-                if data:
-                    data = data.split('@')
-                    if len(data) < 2:
-                        print(f"Unexpected data format: {data}")
-                        continue
-                    return data[0], int(data[1]) + 1
-                wait_time = base_wait_time * (2 ** attempt)
-                print(f"Attempt {attempt + 1} failed, retrying in {wait_time} seconds...")
-                time.sleep(wait_time)
-
-            return "None", 0
+                return "None", path_length
+            
+            ip, port = current_node.get_ip_port(new_node_hop.nodeinfo.__str__())
+            if ip == current_node.ip and port == current_node.port:
+                return current_node.nodeinfo.__str__(), path_length
+            
+            current_node = ring.get(node_hash(port))
+            if current_node is None:
+                return "None", path_length
+            
+            path_length += 1
 
     def find_successor(self, search_id, flag = False):
-        
         # The find_successor function provides the successor of any value in the ring given its id.
-        
-        if(search_id == self.id):
+        if search_id == self.id:
             return str(self.nodeinfo), 1
-        # print("finding succ for id ", search_id)
-        predecessor, pathLength = self.find_predecessor(search_id)
-        # print("Path length", pathLength)
-        # print(flag)
-        # if (flag == True): print("Path length", pathLength)
-        # print("predcessor found is ", predecessor)
-        if(predecessor == "None"):
+        
+        predecessor, path_length = self.find_predecessor(search_id)
+        if predecessor == "None":
+            # 环中没有节点,没有后继,返回None
             return "None", 0
-        ip,port = self.get_ip_port(predecessor)
-        # print(ip ,port , "in find successor, data of predecesor")
-        data = self.request_handler.send_message(ip , port, "get_successor")
-        return data, pathLength
+        
+        ip, port = self.get_ip_port(predecessor)
+        if ip == self.ip and port == self.port:
+            # 前驱就是当前节点,当前节点的后继就是要找的后继
+            return self.successor.nodeinfo.__str__(), path_length
+        else:
+            # 前驱是其他节点,直接调用其get_successor方法
+            node = ring.get(node_hash(port))
+            if node:
+                data = node.get_successor()
+                return data, path_length + 1
+            else:
+                return "None", path_length
+
+    def find_successor(self, key, flag = False):
+        if key == self.id:
+            return self, 1
+        # elif self.node_id < key <= self.successor.node_id:
+        elif self.get_backward_distance(key) < 0 and self.get_forward_distance(key) < self.get_forward_distance(self.successor.id):
+            return self.successor, 1
+        else:
+            succ, path = self.closest_preceding_node(key).find_successor(key)
+            return succ, path + 1
+
 
     def closest_preceding_node(self, search_id):
         closest_node = None
@@ -352,35 +385,33 @@ class Node:
 
     
     def stabilize(self):
-        
         # The stabilize function is called in repetitively in regular intervals as it is responsible to make sure that each 
         # node is pointing to its correct successor and predecessor nodes. By the help of the stabilize function each node
         # is able to gather information of new nodes joining the ring. 
         while self.exist:
-            time.sleep(10)
+            time.sleep(0.1*node_count)
             if self.exist == False:
                 break
             if self.successor is None:
-                time.sleep(10)
+                time.sleep(0.1*node_count)
                 continue
-            data = "get_predecessor"
 
             if self.successor.ip == self.ip  and self.successor.port == self.port:
-                time.sleep(10)
+                time.sleep(0.1*node_count)
             # print(self.id, self.successor.id, "stabilizing")
-            result = self.request_handler.send_message(self.successor.ip , self.successor.port , data)
+            result = self.successor.get_predecessor()
             if result == "None" or result == None or len(result) == 0:
-                self.request_handler.send_message(self.successor.ip , self.successor.port, "notify|"+ str(self.id) + "|" + self.nodeinfo.__str__())
+                self.successor.notify(self.id, self.ip, self.port)
                 continue
 
             # print("found predecessor of my sucessor", result, self.successor.id)
             ip, port = self.get_ip_port(result)
-            result = int(self.request_handler.send_message(ip,port,"get_id"))
-            if self.get_backward_distance(result) > self.get_backward_distance(self.successor.id):
+            result = ring[node_hash(port)].get_id()
+            if self.get_backward_distance(int(result)) > self.get_backward_distance(self.successor.id):
                 # print("changing my succ in stablaize", result)
-                self.successor = ring[hash(str(nodeInf(port, ip)))]
+                self.successor = ring[node_hash(port)]
                 self.finger_table.table[0][1] = self.successor
-            self.request_handler.send_message(self.successor.ip , self.successor.port, "notify|"+ str(self.id) + "|" + self.nodeinfo.__str__())
+            self.successor.notify(self.id, self.ip, self.port)
             # print("===============================================")
             # print("STABILIZING")
             # print("===============================================")
@@ -410,22 +441,29 @@ class Node:
                 # print("someone notified me")
                 # print("changing my pred", node_id)
                 # self.predecessor = Node(node_ip,int(node_port))
-                self.predecessor = ring[hash(str(nodeInf(node_port, node_ip)))]
+                self.predecessor = ring[node_hash(node_port)]
                 return
         if self.predecessor is None or self.predecessor == "None" or ( node_id > self.predecessor.id and node_id < self.id ) or ( self.id == self.predecessor.id and node_id != self.id) :
             # print("someone notified me")
             # print("changing my pred", node_id)
             # self.predecessor = Node(node_ip,int(node_port))
-            self.predecessor = ring[hash(str(nodeInf(node_port, node_ip)))]
+            self.predecessor = ring[node_hash(node_port)]
             if self.id == self.successor.id:
                 # print("changing my succ", node_id)
                 # self.successor = Node(node_ip,int(node_port))
-                self.successor = ring[hash(str(nodeInf(node_port, node_ip)))]
+                self.successor = ring[node_hash(node_port)]
                 self.finger_table.table[0][1] = self.successor
+        # 如果当前节点是新节点的后继,则更新当前节点的前驱指针
+        if self.get_backward_distance(node_id) < self.get_backward_distance(self.id):
+            self.predecessor = ring[node_hash(node_port)]
+            # 将新节点的信息传播给其他节点
+            if self.successor != self:
+                self.successor.notify(node_id, node_ip, node_port)
+
         
     def fix_fingers(self):
         # The fix_fingers function is used to correct the finger table at regular interval of time this function waits for
-        # 10 seconds and then picks one random index of the table and corrects it so that if any new node has joined the 
+        # 1 seconds and then picks one random index of the table and corrects it so that if any new node has joined the 
         # ring it can properly mark that node in its finger table.
         while self.exist:
             time.sleep(5)
@@ -436,12 +474,12 @@ class Node:
             # print("in fix fingers , fixing index", random_index)
             data, _ = self.find_successor(finger, False)
             if data == "None":
-                time.sleep(10)
+                time.sleep(5)
                 continue
             ip, port = self.get_ip_port(data)
             # self.finger_table.table[random_index][1] = Node(ip,port) !!!
-            if ring.get(hash(str(nodeInf(port, ip))) ) != None:
-                self.finger_table.table[random_index][1] = ring[hash(str(nodeInf(port, ip)))]
+            if ring.get(node_hash(port)) != None:
+                self.finger_table.table[random_index][1] = ring[node_hash(port)]
 
             
     def get_successor(self):
@@ -537,90 +575,59 @@ class RequestHandler:
     def __init__(self):
         pass
     def send_message(self, ip, port, message, retries=10, backoff_factor=1.5):
-        # attempt = 0
-        # s = None
-        # while attempt < retries:
-        #     try:
-        #         s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        #         s.connect((ip, port))
-        #         s.send(message.encode('utf-8'))
-        #         data = s.recv(1024)
-        #         return data.decode("utf-8")
-        #     except ConnectionRefusedError as e:
-        #         print(f"Error checking port {port}: {e}")
-        #         attempt += 1
-        #         print(f"Attempt {attempt}: Connection to {ip}:{port} refused. Retrying in {backoff_factor ** attempt:.2f} seconds...")
-        #         time.sleep(backoff_factor ** attempt)
-        #     finally:
-        #         if s is not None:
-        #             s.close()
-        # print(f"Failed to connect to {ip}:{port} after {retries} attempts.")
-        # return None
         return nodeMessageProcessor(ip, port, message)
 
 
 def nodeMessageProcessor(ip, port, message):
-    # from chord import Chord
-    # print(ring)
-    # print(hash(str(nodeInf(port, ip))))
-    # print(message)
-    if ring.get(hash(str(nodeInf(port, ip))) ) == None:
+    if ring.get(node_hash(port)) == None:
         print("Node does not exist")
         return None
-    receiveNode = ring[hash(str(nodeInf(port, ip)))]
+    receiveNode = ring[node_hash(port)]
     response = receiveNode.serve_requests(message)
     return response
 
 def addNode(port, ExistingNodePort):
     node = Node(ip, int(port))
-    # print(hash(str(nodeInf(port, ip))) == node.id)
-    # print("111")
 
     if ring == {}:
         print("creating chord")
         ring[node.id] = node
-        node.predecessor = node
+        node.predecessor = None
         node.successor = node
 
         node.finger_table.table[0][1] = node
         node.start()
-        print("Node added to chord")
-        # print(ring)
+        print(f"Node{node.id} added to chord")
         return
-    elif ring.get(hash(nodeInf(ExistingNodePort))) == None:
+    elif ring.get(node_hash(ExistingNodePort)) == None:
         print("Existing node does not exist")
         return
-    elif ring.get(hash(nodeInf(port))) == None:
+    elif ring.get(node_hash(port)) == None:
         ring[node.id] = node
 
         node.join(ip, ExistingNodePort)
         node.start()
-        print("Node added to chord")
+        print(f"Node{node.id} added to chord")
         return
     else :
         print("Node already exists")
         return
 
 def deleteNode(port):
-    leavingNode = ring[hash(str(nodeInf(port)))]
+    leavingNode = ring[node_hash(port)]
     if leavingNode == None:
         print("Node does not exist")
         return
     leavingNode.leave()
-    del ring[hash(str(nodeInf(port)))]
-
-# def leaveChord():
-#     for node in ring.values():
-#         node.leave()
+    del ring[node_hash(port)]
 
 def enterNode(port, ip = "127.0.0.1"):
-    nodeId = hash(str(nodeInf(port, ip)))
+    nodeId = node_hash(port)
     if ring.get(nodeId) == None:
         print("Node does not exist")
         return
     else:
         node = ring[nodeId]
-        # print(nodeId)
         display(node)
         return
 
@@ -628,7 +635,9 @@ def display(node):
     print("Node id : ", node.id)
     print("Node ip : ", node.ip)
     print("Node port : ", node.port)
-    print("Node finger table : ", node.finger_table.table)
+    print("Node finger table : ")
+    node.finger_table.print()
+
     while(True):
         print("************************MENU*************************")
         print("PRESS ***********************************************")
@@ -672,23 +681,23 @@ def display(node):
 
 if __name__ == "__main__":
     import sys
-    sys.setrecursionlimit(10000000)  # 设置最大递归深度为2000
-    node_count = 500
-    i = 5000
-    suc = 4999
+    sys.setrecursionlimit(20000)  # 设置最大递归深度为2000
+    addNode(5000, None)
+    
     num = 0
+    existing_port = 5000
     while num < node_count:
-        
-        if ring.get(hash(str(nodeInf(i, ip)))) == None:
-            addNode(i, suc)
-            print(num, i, suc)
-            suc+=1
-            num+=1
-        i+=1
+        port = random.randint(1, 5000)
+        if ring.get(node_hash(port)) == None:
+            addNode(port, existing_port)
+            print(num, port)
+            # existing_port = port
+            if num == 127:
+                pass
+            num += 1
 
 
     while(True):
-        # print(ring)
         print("************************MENU*************************")
         print("PRESS ***********************************************")
         print("1. Add a node *****************************************")
@@ -704,7 +713,6 @@ if __name__ == "__main__":
             if ring != {}:
                 ExistingNodePort = input("ENTER THE EXISTING NODE PORT (if any): ")
             addNode(port, ExistingNodePort)
-            # print(f"Add node id {id} to the chord")
             continue
 
         elif(choice == '2'):
