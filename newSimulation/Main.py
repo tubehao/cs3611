@@ -9,8 +9,8 @@ import pydotplus
 from PIL import Image
 import pyfiglet
 
-from lstmnew import Node
-from lstmnewNetwork import Network
+from basicNode import Node
+from basicsNetwork import Network
 ################################################################################################################
 
 

@@ -6,10 +6,8 @@ import concurrent.futures
 import time
 import threading
 import pydotplus
-
-
 from PIL import Image
-from Node import Node
+from basicNode import Node
 ################################################################################################################
 
 
@@ -38,11 +36,8 @@ class Network:
             print(node.data)
 
     def fix_network_fingers(self):
-        # fix all network fingers start from first node
         self.first_node.fix_fingers()
-
         curr = self.first_node.fingers_table[0]
-
         while curr != self.first_node:
             curr.fix_fingers()
             curr = curr.fingers_table[0]
@@ -58,12 +53,10 @@ class Network:
             hashed_id >>= 8 - num_bits % 8
         return hashed_id
     ################################################################################################################
-    # Node related fucntions
+    # Node related functions
 
     def create_node(self, node_id):
-         # create new node object
         node = Node(node_id, self.m)
-        # add node to nodes of network
         return node
 
     def insert_nodes(self, nodes):
@@ -72,7 +65,6 @@ class Network:
                 if(node.node_id > self.ring_size):
                     raise NetworkError(
                         '[-]Node id should be smaller or equal to the networks size.')
-                # add new node to the network
                 print(
                     f'[+]Node {node.node_id} joined the network via node: {self.first_node.node_id}')
 
@@ -81,7 +73,6 @@ class Network:
                 print(e)
 
     def insert_node(self, node_id):
-
         try:
             if(node_id > self.ring_size):
                 raise NetworkError(
@@ -91,18 +82,14 @@ class Network:
 
             node = self.nodes[-1]
 
-            # add new node to the network
             print(
                 f'[+]Node {node.node_id} joined the network via node: {self.first_node.node_id}')
 
             node.join(self.first_node)
-
-            # self.fix_network_fingers()
         except NetworkError as e:
             print(e)
 
     def delete_node(self, node_id):
-
         try:
             node = list(filter(lambda temp_node: temp_node.node_id ==
                                node_id, self.nodes))[0]
@@ -115,89 +102,63 @@ class Network:
 
     def insert_first_node(self, node_id):
         print(f'[!]Initializing network , inserting first node {node_id}\n')
-        # create new node object
         node = Node(node_id, self.m)
-        # add node to nodes of network
         self.nodes.append(node)
     ################################################################################################################
     # Data related functions
     def find_data(self, data):
-
         hashed_key = self.hash_function(data)
-
         print(f'[*]Searching  \'{data}\' with key {hashed_key}')
         node = self.first_node
-
         node, path = node.find_successor(hashed_key)
-
         found_data = node.data.get(hashed_key, None)
-
         if found_data != None:
             print(
-                f'[+]Found \'{data}\' in node {node.node_id} with key {hashed_key}, pathLength: {path}')
+                f'[+]Found \'{data}\' in node {node.node_id} with key {hashed_key}')
         else:
             print(f'[-]\'{data}\' not exist in the network')
         return path
 
     def insert_data(self, key):
         node = self.first_node
-
         hashed_key = self.hash_function(key)
         print(
-            f'[+]Saving Key:{key} with Hash:{hashed_key} -> Node:{node.find_successor(hashed_key)[0].node_id}, path: {node.find_successor(hashed_key)[1]}')
-
+            f'[+]Saving Key:{key} with Hash:{hashed_key} -> Node:{node.find_successor(hashed_key)[0].node_id}')
         succ, path = node.find_successor(hashed_key)
-
         succ.data[hashed_key] = key
         return path
 
     def generate_fake_data(self, num):
-
         extensions = ['.txt', '.png', '.doc', '.mov', '.jpg', '.py']
         files = [f'file_{i}'+choice(extensions) for i in range(num)]
-
         start_time = time.time()
         for temp in files:
             self.insert_data(temp)
-
         print(f'\n {float(time.time() - start_time)/num} seconds ---')
 
     ################################################################################################################
 
     def print_network(self):
         f = open('graph.dot', 'w+')
-        # print('digraph G {')
         f.write('digraph G {\r\n')
         for node in self.nodes:
             data = 'Keys:\n-------------\n'
-            # print(f'{node.node_id} -> {node.successor.node_id}')
             f.write(f'{node.node_id} -> {node.successor.node_id}\r\n')
             for key in sorted(node.data.keys()):
                 data += f'key: {key} - data: \'{node.data[key]}\'\n'
-
             fingers = 'Finger Table:\n-------------\n'
             for i in range(self.m):
-
                 fingers += f'{(node.node_id + 2 ** i) % self.ring_size} : {node.fingers_table[i].node_id}\n'
-
             if data != '' and data != 'Keys:\n-------------\n':
-                # print(f'data_{node.node_id} [label='{data}', shape=box]')
                 f.write(
                     f'data_{node.node_id} [label=\"{data}\", shape=box]\r\n')
-                # print(f'{node.node_id}->data_{node.node_id}')
                 f.write(f'{node.node_id}->data_{node.node_id}\r\n')
-
             if fingers != '':
-                # print(f'fingers_{node.node_id} [label='{fingers}', shape=box]')
                 f.write(
                     f'fingers_{node.node_id} [label=\"{fingers}\", shape=box]\r\n')
-                # print(f'{node.node_id}->fingers_{node.node_id}')
                 f.write(f'{node.node_id}->fingers_{node.node_id}\r\n')
-
-        # print('}')
         f.write('}')
         f.close()
-
         try:
             graph_a = pydotplus.graph_from_dot_file('graph.dot')
             graph_a.write_png('graph.png', prog='circo')
@@ -208,6 +169,3 @@ class Network:
 
     def periodic_fix(self):
         threading.Timer(15, self.fix_network_fingers).start()
-
-
-################################################################################################################

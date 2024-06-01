@@ -1,0 +1,4 @@
+Number of Nodes: 10
+Average Hops: 1.0
+Number of Trials: 2000
+

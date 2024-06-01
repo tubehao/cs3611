@@ -1,0 +1,40 @@
+Number of Nodes: 10
+Average Hops: 2.9005
+Number of Trials: 2000
+
+Number of Nodes: 50
+Average Hops: 6.503
+Number of Trials: 2000
+
+Number of Nodes: 100
+Average Hops: 5.834
+Number of Trials: 2000
+
+Number of Nodes: 200
+Average Hops: 7.047
+Number of Trials: 2000
+
+Number of Nodes: 500
+Average Hops: 7.8295
+Number of Trials: 2000
+
+Number of Nodes: 1000
+Average Hops: 8.4545
+Number of Trials: 2000
+
+Number of Nodes: 2000
+Average Hops: 8.769
+Number of Trials: 2000
+
+Number of Nodes: 5000
+Average Hops: 9.5515
+Number of Trials: 2000
+
+Number of Nodes: 10000
+Average Hops: 10.291
+Number of Trials: 2000
+
+Number of Nodes: 100000
+Average Hops: 12.41
+Number of Trials: 2000
+

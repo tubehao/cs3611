@@ -1,0 +1,16 @@
+Number of Nodes: 10
+Average Hops: 1.0
+Number of Trials: 2000
+
+Number of Nodes: 50
+Average Hops: 1.0
+Number of Trials: 2000
+
+Number of Nodes: 100
+Average Hops: 1.0
+Number of Trials: 2000
+
+Number of Nodes: 200
+Average Hops: 1.0
+Number of Trials: 2000
+

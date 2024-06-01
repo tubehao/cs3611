@@ -9,7 +9,10 @@ import pydotplus
 
 
 from PIL import Image
-from ChangeNode import Node
+
+plan = sys.argv[1]
+
+Node = __import__(plan).Node
 ################################################################################################################
 
 
