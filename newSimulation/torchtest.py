@@ -1,14 +1,96 @@
+
+import torch
+import torch.nn as nn
+import torch.optim as optim
+import numpy as np
+
+class AccessPredictor(nn.Module):
+    def __init__(self, input_size, hidden_size, output_size):
+        super(AccessPredictor, self).__init__()
+        self.fc1 = nn.Linear(input_size, hidden_size)
+        self.relu = nn.ReLU()
+        self.fc2 = nn.Linear(hidden_size, output_size)
+
+    def forward(self, x):
+        out = self.fc1(x)
+        out = self.relu(out)
+        out = self.fc2(out)
+        return out
+
 class Node(object):
     m = 0
     ring_size = 2 ** m
 
-    def __init__(self, node_id, m):
+    def __init__(self, node_id, m, predictor=None):
         self.node_id = node_id
         self.predecessor = self
         self.successor = self
         self.data = dict()
         self.fingers_table = [self]*m
         self.access_count = {}
+        self.access_history = {}
+        self.predictor = predictor if predictor else AccessPredictor(input_size=10, hidden_size=20, output_size=1)
+        self.optimizer = optim.Adam(self.predictor.parameters(), lr=0.01)
+        self.loss_fn = nn.MSELoss()
+
+    def record_access(self, key):
+        if key in self.access_count:
+            self.access_count[key] += 1
+        else:
+            self.access_count[key] = 1
+        
+        if key not in self.access_history:
+            self.access_history[key] = []
+        self.access_history[key].append(self.access_count[key])
+        
+        if len(self.access_history[key]) > 10:
+            self.access_history[key] = self.access_history[key][-10:]
+
+    def train_predictor(self, key):
+        if key not in self.access_history or len(self.access_history[key]) < 2:
+            return
+        history = np.array(self.access_history[key], dtype=np.float32)
+        inputs = torch.tensor(history[:-1]).unsqueeze(0)
+        targets = torch.tensor(history[1:]).unsqueeze(0)
+        outputs = self.predictor(inputs)
+        loss = self.loss_fn(outputs, targets)
+        self.optimizer.zero_grad()
+        loss.backward()
+        self.optimizer.step()
+
+    def predict_access(self, key):
+        if key not in self.access_history or len(self.access_history[key]) < 1:
+            return 0
+        history = np.array(self.access_history[key], dtype=np.float32)
+        inputs = torch.tensor(history[-10:]).unsqueeze(0)
+        prediction = self.predictor(inputs).item()
+        return prediction
+
+    def fix_fingers(self):
+        predictions = {}
+        for key in self.access_count.keys():
+            self.train_predictor(key)
+            predictions[key] = self.predict_access(key)
+        
+        sorted_keys = sorted(predictions.keys(), key=lambda k: predictions[k], reverse=True)
+        
+        for i in range(len(self.fingers_table)):
+            if i < len(sorted_keys):
+                hot_key = sorted_keys[i]
+                self.fingers_table[i], _ = self.find_successor(self.hash_function(hot_key))
+            else:
+                self.fingers_table[i], _ = self.find_successor(self.node_id + 2 ** i)
+
+    def find_successor(self, key):
+        if self.node_id == key:
+            return self, 1
+        if self.distance(self.node_id, key) <= self.distance(self.successor.node_id, key):
+            self.record_access(key)
+            return self.successor, 1
+        next_node, path = self.closest_preceding_node(self, key).find_successor(key)
+        self.record_access(key)
+        return next_node, path+1
+
 
     def __str__(self):
         return f'Node {self.node_id}'
@@ -30,13 +112,17 @@ class Node(object):
     # Add  node to the network
     def join(self, node):
         # find nodes succesor in the network
-        succ_node, _ = node.find_successor(self.node_id)
+        succ_node, path = node.find_successor(self.node_id)
+
         # find predecessor of successor
         pred_node = succ_node.predecessor
+
         # insert node in the right place on the network
         self.find_node_place(pred_node, succ_node)
+
         # fix fingers of inserted node
         self.fix_fingers()
+
         self.take_successor_keys()
 
     def leave(self):
@@ -44,6 +130,7 @@ class Node(object):
         self.predecessor.successor = self.successor
         self.predecessor.fingers_table[0] = self.successor
         self.successor.predecessor = self.predecessor
+
         #pass key to successor
         for key in sorted(self.data.keys()):
             self.successor.data[key] = self.data[key]
@@ -53,7 +140,9 @@ class Node(object):
     def find_node_place(self, pred_node, succ_node):
         pred_node.fingers_table[0] = self
         pred_node.successor = self
+
         succ_node.predecessor = self
+
         self.fingers_table[0] = succ_node
         self.successor = succ_node
         self.predecessor = pred_node
@@ -62,51 +151,33 @@ class Node(object):
         #take the keys from your succ that are >= node_id
         self.data = {key: self.successor.data[key] for key in sorted(
             self.successor.data.keys()) if key <= self.node_id}
+
         for key in sorted(self.data.keys()):
             if key in self.successor.data:
                 del self.successor.data[key]
 
     ################################################################################################################
 
-    # Update finger tables
-    def fix_fingers(self):
-        sorted_keys = sorted(self.access_count.keys(), key=lambda k: self.access_count[k], reverse=True)
-        for i in range(len(self.fingers_table)):
-            temp_node, _ = self.find_successor(self.node_id + 2 ** i)
-            self.fingers_table[i] = temp_node
-            if i < len(sorted_keys):
-                hot_key = sorted_keys[i]
-                self.fingers_table[i], _ = self.find_successor(hot_key)
+
 
     ################################################################################################################
     # return closest preceding node
     def closest_preceding_node(self, node, hashed_key):
+
         for i in range(len(node.fingers_table)-1, 0, -1):
             if self.distance(node.fingers_table[i-1].node_id, hashed_key) < self.distance(node.fingers_table[i].node_id, hashed_key):
                 return node.fingers_table[i-1]
+
         return node.fingers_table[-1]
 
     ################################################################################################################
 
     def distance(self, n1, n2):
+
         return n2-n1 if n1 <= n2 else self.ring_size - n1 + n2
 
     ################################################################################################################
 
     # Find the node responsible for the key
-    def find_successor(self, key):
-        if self.node_id == key:
-            return self, 1
-        if self.distance(self.node_id, key) <= self.distance(self.successor.node_id, key):
-            return self.successor, 1
-        else:
-            succ, path = self.closest_preceding_node(self, key).find_successor(key)
-            return succ, path + 1
-
-    def record_access(self, key):
-        if key in self.access_count:
-            self.access_count[key] += 1
-        else:
-            self.access_count[key] = 1
-
+  
     ################################################################################################################

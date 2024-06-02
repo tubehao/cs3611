@@ -10,9 +10,12 @@ import pydotplus
 
 from PIL import Image
 
-plan = sys.argv[1]
+plan = 'Node'
+if len(sys.argv) > 1:
+    plan = sys.argv[1]
 
-Node = __import__(plan).Node
+# Node = __import__(plan).Node
+from lstm import Node
 ################################################################################################################
 
 
@@ -164,6 +167,21 @@ class Network:
 
         succ.data[hashed_key] = key
         return path
+
+    def delete_data(self, value):
+        hashed_key = self.hash_function(value)
+        print(f'[*]Deleting \'{value}\' with key {hashed_key}')
+        node = self.first_node
+
+        node, path = node.find_successor(hashed_key)
+
+        if hashed_key in node.data:
+            del node.data[hashed_key]
+            print(f'[+]Deleted \'{value}\' from node {node.node_id} with key {hashed_key}, pathLength: {path}')
+        else:
+            print(f'[-]\'{value}\' not found in the network')
+        return path
+
 
     def generate_fake_data(self, num):
 

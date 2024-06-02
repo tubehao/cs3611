@@ -6,15 +6,14 @@ import concurrent.futures
 import time
 import threading
 import pydotplus
+
 from PIL import Image
 from basicNode import Node
 ################################################################################################################
 
-
 class NetworkError(Exception):
     def __init__(self, msg='[-]Network Error!', *args, **kwargs):
         super().__init__(msg, *args, **kwargs)
-
 
 class Network:
     def __init__(self, m, node_ids):
@@ -36,8 +35,11 @@ class Network:
             print(node.data)
 
     def fix_network_fingers(self):
+        # fix all network fingers start from first node
         self.first_node.fix_fingers()
+
         curr = self.first_node.fingers_table[0]
+
         while curr != self.first_node:
             curr.fix_fingers()
             curr = curr.fingers_table[0]
@@ -52,11 +54,14 @@ class Network:
         if num_bits % 8:
             hashed_id >>= 8 - num_bits % 8
         return hashed_id
+
     ################################################################################################################
     # Node related functions
 
     def create_node(self, node_id):
+         # create new node object
         node = Node(node_id, self.m)
+        # add node to nodes of network
         return node
 
     def insert_nodes(self, nodes):
@@ -65,6 +70,7 @@ class Network:
                 if(node.node_id > self.ring_size):
                     raise NetworkError(
                         '[-]Node id should be smaller or equal to the networks size.')
+                # add new node to the network
                 print(
                     f'[+]Node {node.node_id} joined the network via node: {self.first_node.node_id}')
 
@@ -82,6 +88,7 @@ class Network:
 
             node = self.nodes[-1]
 
+            # add new node to the network
             print(
                 f'[+]Node {node.node_id} joined the network via node: {self.first_node.node_id}')
 
@@ -102,7 +109,9 @@ class Network:
 
     def insert_first_node(self, node_id):
         print(f'[!]Initializing network , inserting first node {node_id}\n')
+        # create new node object
         node = Node(node_id, self.m)
+        # add node to nodes of network
         self.nodes.append(node)
     ################################################################################################################
     # Data related functions
@@ -159,6 +168,7 @@ class Network:
                 f.write(f'{node.node_id}->fingers_{node.node_id}\r\n')
         f.write('}')
         f.close()
+
         try:
             graph_a = pydotplus.graph_from_dot_file('graph.dot')
             graph_a.write_png('graph.png', prog='circo')
@@ -167,5 +177,7 @@ class Network:
         except pydotplus.graphviz.InvocationException:
             pass
 
-    def periodic_fix(self):
-        threading.Timer(15, self.fix_network_fingers).start()
+    def periodic_fix(self, interval=15):
+        for node in self.nodes:
+            node.fix_fingers()
+        threading.Timer(interval, self.periodic_fix).start()

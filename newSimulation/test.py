@@ -9,27 +9,32 @@ import pyfiglet
 if not os.path.exists('.\log'):
     os.makedirs('.\log')
 
-nodeplan = 'Node'
-networkplan = 'Network'
+nodeplan = 'mlpnew'
+networkplan = 'network'
 
-if len(sys.argv) > 1:
-    nodeplan = sys.argv[1]
-if len(sys.argv) > 2:
-    networkplan = sys.argv[2]
+# if len(sys.argv) > 1:
+#     nodeplan = sys.argv[1]
+# if len(sys.argv) > 2:
+#     networkplan = sys.argv[2]
 
-Node = __import__(nodeplan).Node
-Network = __import__(networkplan).Network
+# Node = __import__(nodeplan).Node
+# Network = __import__(networkplan).Network
+
+from Network import Network
+from lstm import Node
 # 根据需要添加更多的导入选项
 
 def time_elapsed(start_time, mess):
     print(f'\n---{mess} in: {(time.time() - start_time)} seconds ---')
 
 def measure_performance(chord_net, node_ids, num_trials=2000):
-    results = []
+    results_insert = []
+    results_search = []
 
     for num_nodes in [10, 50, 100, 200, 500, 1000, 2000, 5000, 10000]:  # 不同的节点数
         print(f'\nTesting with {num_nodes} nodes...')
-        results = []  # 重置results列表
+        results_insert = []  # 重置插入结果列表
+        results_search = []  # 重置查找结果列表
 
         # 创建网络
         node_ids = sample(range(Node.ring_size), num_nodes) 
@@ -37,22 +42,37 @@ def measure_performance(chord_net, node_ids, num_trials=2000):
         for node_id in node_ids:
             chord_net.insert_node(node_id)
 
+        inserted_data = []  # 存储插入的数据
+
         # 插入操作
         for _ in range(num_trials):
             data = str(choice(range(10000)))  # 随机数据
             start_time = time.time()
             hops_insert = chord_net.insert_data(data)
             time_elapsed(start_time, 'insert data')
-            results.append(hops_insert)  # 保留每次插入操作的结果
+            results_insert.append(hops_insert)  # 保留每次插入操作的结果
+            inserted_data.append(data)  # 记录插入的数据
+
+        # 查找操作
+        for data in inserted_data:
+            num_searches = choice(range(50, 100))  # 随机查找次数（4-10次）
+            for _ in range(num_searches):
+                start_time = time.time()
+                hops_search = chord_net.find_data(data)
+                time_elapsed(start_time, 'search data')
+                results_search.append(hops_search)  # 保留每次查找操作的结果
 
         # 计算平均值
-        average_hops = sum(results) / len(results)
+        average_hops_insert = sum(results_insert) / len(results_insert)
+        average_hops_search = sum(results_search) / len(results_search)
 
         # 将平均值和次数附加在日志文件末尾
         with open(f".\log\logNode{nodeplan}Network{networkplan}.txt", 'a') as file:
             file.write(f"Number of Nodes: {num_nodes}\n")
-            file.write(f"Average Hops: {average_hops}\n")
+            file.write(f"Average Hops (Insert): {average_hops_insert}\n")
+            file.write(f"Average Hops (Search): {average_hops_search}\n")
             file.write(f"Number of Trials: {num_trials}\n\n")
+
 
 def create_network():
     sys.setrecursionlimit(10000000)

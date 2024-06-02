@@ -9,8 +9,8 @@ import pydotplus
 from PIL import Image
 import pyfiglet
 
-from basicNode import Node
-from basicsNetwork import Network
+from Node import Node
+from Network import Network
 ################################################################################################################
 
 
@@ -65,6 +65,12 @@ def show_menu(chord_net, node_ids):
             path = chord_net.insert_data(query)
 
             time_elapsed(start_time, 'insert data')
+        elif (choice == '8'):
+            # delete data from network
+            query = input('[->]Enter data: ')
+            start_time = time.time()
+            path = chord_net.delete_data(query)
+            time_elapsed(start_time, 'delete data')
 
         elif (choice == '4'):
             # print network graph
