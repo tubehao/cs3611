@@ -21,7 +21,7 @@ networkplan = 'lstm1'
 # Node = __import__(nodeplan).Node
 # Network = __import__(networkplan).Network
 
-from Network import Network
+from lstmNetwork import Network
 from lstm import Node
 # 根据需要添加更多的导入选项
 

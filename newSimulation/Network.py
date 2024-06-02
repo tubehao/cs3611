@@ -15,7 +15,7 @@ if len(sys.argv) > 1:
     plan = sys.argv[1]
 
 # Node = __import__(plan).Node
-from lstm import Node
+from Node import Node
 ################################################################################################################
 
 
