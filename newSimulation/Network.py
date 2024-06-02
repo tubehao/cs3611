@@ -114,7 +114,7 @@ class Network:
 
             node.join(self.first_node)
 
-            # self.fix_network_fingers()
+            self.fix_network_fingers()
         except NetworkError as e:
             print(e)
 
@@ -142,7 +142,7 @@ class Network:
 
         hashed_key = self.hash_function(data)
 
-        print(f'[*]Searching  \'{data}\' with key {hashed_key}')
+        # print(f'[*]Searching  \'{data}\' with key {hashed_key}')
         node = self.first_node
 
         node, path = node.find_successor(hashed_key)
@@ -170,7 +170,7 @@ class Network:
 
     def delete_data(self, value):
         hashed_key = self.hash_function(value)
-        print(f'[*]Deleting \'{value}\' with key {hashed_key}')
+        # print(f'[*]Deleting \'{value}\' with key {hashed_key}')
         node = self.first_node
 
         node, path = node.find_successor(hashed_key)

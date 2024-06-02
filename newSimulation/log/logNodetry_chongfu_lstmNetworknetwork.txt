@@ -1,0 +1,45 @@
+Number of Nodes: 10
+Average Hops (Insert): 3.9565
+Average Hops (Search): 4.2
+Number of Trials: 2000
+
+Number of Nodes: 50
+Average Hops (Insert): 5.9425
+Average Hops (Search): 5.4
+Number of Trials: 2000
+
+Number of Nodes: 100
+Average Hops (Insert): 6.7725
+Average Hops (Search): 6.4
+Number of Trials: 2000
+
+Number of Nodes: 200
+Average Hops (Insert): 6.6175
+Average Hops (Search): 7.4
+Number of Trials: 2000
+
+Number of Nodes: 500
+Average Hops (Insert): 7.46
+Average Hops (Search): 6.3
+Number of Trials: 2000
+
+Number of Nodes: 1000
+Average Hops (Insert): 7.853
+Average Hops (Search): 7.9
+Number of Trials: 2000
+
+Number of Nodes: 2000
+Average Hops (Insert): 9.004
+Average Hops (Search): 8.3
+Number of Trials: 2000
+
+Number of Nodes: 5000
+Average Hops (Insert): 9.542
+Average Hops (Search): 9.7
+Number of Trials: 2000
+
+Number of Nodes: 10000
+Average Hops (Insert): 9.8055
+Average Hops (Search): 9.0
+Number of Trials: 2000
+

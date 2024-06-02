@@ -1,0 +1,15 @@
+Number of Nodes: 10
+Average Hops (Insert): 5.32
+Average Hops (Search): 5.165165165165165
+Number of Trials: 50
+
+Number of Nodes: 50
+Average Hops (Insert): 7.76
+Average Hops (Search): 7.66120218579235
+Number of Trials: 50
+
+Number of Nodes: 100
+Average Hops (Insert): 10.72
+Average Hops (Search): 10.726027397260275
+Number of Trials: 50
+

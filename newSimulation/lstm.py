@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 import numpy as np
-
+import hashlib
 class LSTMPredictor(nn.Module):
     def __init__(self, input_size, hidden_size, output_size, num_layers=1):
         super(LSTMPredictor, self).__init__()
@@ -20,7 +20,7 @@ class LSTMPredictor(nn.Module):
 
 
 class Node(object):
-    m = 0
+    m = 11
     ring_size = 2 ** m
 
     def __init__(self, node_id, m):
@@ -39,7 +39,6 @@ class Node(object):
 
     def __lt__(self, other):
         return self.node_id < other.node_id
-
     ################################################################################################################
 
     def print_fingers_table(self):
@@ -58,6 +57,7 @@ class Node(object):
         if key not in self.access_history:
             self.access_history[key] = []
         self.access_history[key].append(self.access_count[key])
+        # print(self.access_history)
 
     def train_model(self, key):
         if len(self.access_history[key]) < 10:
@@ -80,7 +80,7 @@ class Node(object):
             prediction = self.lstm_model(sequence)
         return prediction[-1].item()
     ################################################################################################################
-    # Add  node to the network
+    # Add node to the network
     def join(self, node):
         # find nodes succesor in the network
         succ_node, path = node.find_successor(self.node_id)
@@ -131,18 +131,33 @@ class Node(object):
 
     # Update finger tables
     def fix_fingers(self):
-        for key in self.access_history.keys():
-            self.train_model(key)
+        print("fix_finger_______________________________")
         
+        # 预测访问频率
         predictions = {key: self.predict_access(key) for key in self.access_history.keys()}
         sorted_keys = sorted(predictions.keys(), key=lambda k: predictions[k], reverse=True)
+        print("Predictions:", predictions)
+        print("Sorted Keys:", sorted_keys)
         
+        # 更新 fingers_table
         for i in range(len(self.fingers_table)):
-            if i < len(sorted_keys):
-                hot_key = sorted_keys[i]
-                self.fingers_table[i], _ = self.find_successor(self.hash_function(hot_key))
+            start = (self.node_id + 2 ** i) % self.ring_size
+            print(f"Updating finger {i}, start: {start}")
+            
+            # 查找符合条件的 sorted_keys
+            for hot_key in sorted_keys:
+                hot_key_hashed = hot_key
+                if self.node_id < hot_key_hashed <= start or (self.node_id > start and (hot_key_hashed > self.node_id or hot_key_hashed <= start)):
+                    self.fingers_table[i], _ = self.find_successor(hot_key_hashed)
+                    print(f"Finger {i} updated to hot key {hot_key} with node {self.fingers_table[i].node_id}")
+                    break
             else:
-                self.fingers_table[i], _ = self.find_successor(self.node_id + 2 ** i)
+                self.fingers_table[i], _ = self.find_successor(start)
+                print(f"Finger {i} updated to node {self.fingers_table[i].node_id}")
+        
+        print("finish fix finger")
+
+
 
     ################################################################################################################
     # return closest preceding node
@@ -164,12 +179,18 @@ class Node(object):
 
     # Find the node responsible for the key
     def find_successor(self, key):
+        print(f"find_successor called with key: {key}")
         if self.node_id == key:
+            print(f"Node {self.node_id} is the successor of key {key}")
             return self, 1
         if self.distance(self.node_id, key) <= self.distance(self.successor.node_id, key):
+            print(f"Node {self.successor.node_id} is the successor of key {key}")
             self.record_access(key)
             return self.successor, 1
-        next_node, path = self.closest_preceding_node(self, key).find_successor(key)
+        next_node = self.closest_preceding_node(self, key)
+        print(f"Closest preceding node for key {key} is {next_node.node_id}")
+        next_node, path = next_node.find_successor(key)
         self.record_access(key)
         return next_node, path+1
+
     ################################################################################################################

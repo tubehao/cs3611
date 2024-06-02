@@ -1,6 +1,6 @@
 
 class Node(object):
-    m = 0
+    m = 11
     ring_size = 2 ** m
 
     def __init__(self, node_id, m):

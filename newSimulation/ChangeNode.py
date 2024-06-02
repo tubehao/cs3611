@@ -1,6 +1,10 @@
+import hashlib
+import numpy as np
+from sklearn.linear_model import LinearRegression
+
 
 class Node(object):
-    m = 0
+    m = 11
     ring_size = 2 ** m
 
     def __init__(self, node_id, m):
@@ -109,7 +113,7 @@ class Node(object):
         for i in range(len(self.fingers_table)):
             if i < len(sorted_keys):
                 hot_key = sorted_keys[i]
-                self.fingers_table[i], _ = self.find_successor(self.hash_function(hot_key))
+                self.fingers_table[i], _ = self.find_successor(hot_key)
             else:
                 self.fingers_table[i], _ = self.find_successor(self.node_id + 2 ** i)
 
@@ -137,8 +141,10 @@ class Node(object):
         if self.node_id == key:
             return self, 1
         if self.distance(self.node_id, key) <= self.distance(self.successor.node_id, key):
+
             self.record_access(key)
             return self.successor, 1
+
         next_node, path = self.closest_preceding_node(self, key).find_successor(key)
         self.record_access(key)
         return next_node, path+1

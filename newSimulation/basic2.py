@@ -114,7 +114,7 @@ class Network:
 
             node.join(self.first_node)
 
-            # self.fix_network_fingers()
+            self.fix_network_fingers()
         except NetworkError as e:
             print(e)
 
