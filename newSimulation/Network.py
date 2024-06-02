@@ -148,6 +148,7 @@ class Network:
         node, path = node.find_successor(hashed_key)
 
         found_data = node.data.get(hashed_key, None)
+        node.train_model(hashed_key)
 
         if found_data != None:
             print(

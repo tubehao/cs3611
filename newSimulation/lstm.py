@@ -60,8 +60,12 @@ class Node(object):
         # print(self.access_history)
 
     def train_model(self, key):
+        if self.access_history.get(key) is None:
+            return
         if len(self.access_history[key]) < 10:
             return  # Not enough data to train on
+        # with open(f".\lognew\logNodenodeNetworklstmnew.txt", 'a') as file:
+        #     file.write("trianning")
         sequence = torch.tensor(self.access_history[key], dtype=torch.float).view(-1, 1, 1)
         target = sequence[1:]
         sequence = sequence[:-1]

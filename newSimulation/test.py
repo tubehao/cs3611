@@ -11,7 +11,7 @@ if not os.path.exists('.\log'):
     os.makedirs('.\log')
 import hashlib
 nodeplan = 'node'
-networkplan = 'lstm'
+networkplan = 'lstmnew'
 
 # if len(sys.argv) > 1:
 #     nodeplan = sys.argv[1]
