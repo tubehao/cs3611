@@ -15,7 +15,7 @@ if len(sys.argv) > 1:
     plan = sys.argv[1]
 
 # Node = __import__(plan).Node
-from lstm import Node
+from linear import Node
 ################################################################################################################
 
 
@@ -114,7 +114,7 @@ class Network:
 
             node.join(self.first_node)
 
-            self.fix_network_fingers()
+            # self.fix_network_fingers()
         except NetworkError as e:
             print(e)
 
@@ -148,7 +148,7 @@ class Network:
         node, path = node.find_successor(hashed_key)
 
         found_data = node.data.get(hashed_key, None)
-        node.train_model(hashed_key)
+        # node.train_model(hashed_key)
 
         if found_data != None:
             print(
@@ -167,6 +167,7 @@ class Network:
         succ, path = node.find_successor(hashed_key)
 
         succ.data[hashed_key] = key
+        node.fix_fingers()
         return path
 
     def delete_data(self, value):

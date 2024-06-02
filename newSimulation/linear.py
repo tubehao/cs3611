@@ -1,22 +1,6 @@
-import torch
-import torch.nn as nn
-import numpy as np
 import hashlib
-class LSTMPredictor(nn.Module):
-    def __init__(self, input_size, hidden_size, output_size, num_layers=1):
-        super(LSTMPredictor, self).__init__()
-        self.hidden_size = hidden_size
-        self.num_layers = num_layers
-        self.lstm = nn.LSTM(input_size, hidden_size, num_layers, batch_first=True)
-        self.fc = nn.Linear(hidden_size, output_size)
-
-    def forward(self, x):
-        h0 = torch.zeros(self.num_layers, x.size(0), self.hidden_size).to(x.device)
-        c0 = torch.zeros(self.num_layers, x.size(0), self.hidden_size).to(x.device)
-        out, _ = self.lstm(x, (h0, c0))
-        out = self.fc(out[:, -1, :])
-        return out
-
+import numpy as np
+from sklearn.linear_model import LinearRegression
 
 
 class Node(object):
@@ -31,14 +15,13 @@ class Node(object):
         self.fingers_table = [self]*m
         self.access_count = {}
         self.access_history = {}
-        self.lstm_model = LSTMPredictor(input_size=1, hidden_size=50, output_size=1)
-        self.criterion = nn.MSELoss()
-        self.optimizer = torch.optim.Adam(self.lstm_model.parameters(), lr=0.001)
+
     def __str__(self):
         return f'Node {self.node_id}'
 
     def __lt__(self, other):
         return self.node_id < other.node_id
+
     ################################################################################################################
 
     def print_fingers_table(self):
@@ -48,6 +31,8 @@ class Node(object):
         for i in range(self.m):
             print(
                 f'{(self.node_id + 2 ** i) % self.ring_size} : {self.fingers_table[i].node_id}')
+
+    ################################################################################################################
     def record_access(self, key):
         if key in self.access_count:
             self.access_count[key] += 1
@@ -57,34 +42,18 @@ class Node(object):
         if key not in self.access_history:
             self.access_history[key] = []
         self.access_history[key].append(self.access_count[key])
-        # print(self.access_history)
-
-    def train_model(self, key):
-        if self.access_history.get(key) is None:
-            return
-        if len(self.access_history[key]) < 10:
-            return  # Not enough data to train on
-        # with open(f".\lognew\logNodenodeNetworklstmnew.txt", 'a') as file:
-        #     file.write("trianning")
-        sequence = torch.tensor(self.access_history[key], dtype=torch.float).view(-1, 1, 1)
-        target = sequence[1:]
-        sequence = sequence[:-1]
-
-        self.optimizer.zero_grad()
-        output = self.lstm_model(sequence)
-        loss = self.criterion(output, target)
-        loss.backward()
-        self.optimizer.step()
 
     def predict_access(self, key):
-        if key not in self.access_history or len(self.access_history[key]) < 10:
+        if key not in self.access_history or len(self.access_history[key]) < 2:
             return 0
-        with torch.no_grad():
-            sequence = torch.tensor(self.access_history[key], dtype=torch.float).view(-1, 1, 1)
-            prediction = self.lstm_model(sequence)
-        return prediction[-1].item()
-    ################################################################################################################
-    # Add node to the network
+        X = np.arange(len(self.access_history[key])).reshape(-1, 1)
+        y = np.array(self.access_history[key])
+        model = LinearRegression()
+        model.fit(X, y)
+        prediction = model.predict(np.array([[len(self.access_history[key])]]))[0]
+        return prediction
+
+    # Add  node to the network
     def join(self, node):
         # find nodes succesor in the network
         succ_node, path = node.find_successor(self.node_id)
@@ -135,13 +104,11 @@ class Node(object):
 
     # Update finger tables
     def fix_fingers(self):
-        print("fix_finger_______________________________")
+        predictions = {}
+        for key in self.access_count.keys():
+            predictions[key] = self.predict_access(key)
         
-        # 预测访问频率
-        predictions = {key: self.predict_access(key) for key in self.access_history.keys()}
         sorted_keys = sorted(predictions.keys(), key=lambda k: predictions[k], reverse=True)
-        print("Predictions:", predictions)
-        print("Sorted Keys:", sorted_keys)
         
         # 更新 fingers_table
         for i in range(1, len(self.fingers_table)):
@@ -173,14 +140,12 @@ class Node(object):
         
         print("finish fix finger")
 
-
-
-
     ################################################################################################################
     # return closest preceding node
     def closest_preceding_node(self, node, hashed_key):
 
         for i in range(len(node.fingers_table)-1, 0, -1):
+            # print(node.fingers_table[i-1])
             if self.distance(node.fingers_table[i-1].node_id, hashed_key) < self.distance(node.fingers_table[i].node_id, hashed_key):
                 return node.fingers_table[i-1]
 
@@ -196,18 +161,14 @@ class Node(object):
 
     # Find the node responsible for the key
     def find_successor(self, key):
-        print(f"find_successor called with key: {key}")
         if self.node_id == key:
-            print(f"Node {self.node_id} is the successor of key {key}")
             return self, 1
         if self.distance(self.node_id, key) <= self.distance(self.successor.node_id, key):
-            print(f"Node {self.successor.node_id} is the successor of key {key}")
+
             self.record_access(key)
             return self.successor, 1
-        next_node = self.closest_preceding_node(self, key)
-        print(f"Closest preceding node for key {key} is {next_node.node_id}")
-        next_node, path = next_node.find_successor(key)
+
+        next_node, path = self.closest_preceding_node(self, key).find_successor(key)
         self.record_access(key)
         return next_node, path+1
-
     ################################################################################################################

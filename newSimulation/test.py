@@ -11,7 +11,7 @@ if not os.path.exists('.\log'):
     os.makedirs('.\log')
 import hashlib
 nodeplan = 'node'
-networkplan = 'lstmnew'
+networkplan = 'linear'
 
 # if len(sys.argv) > 1:
 #     nodeplan = sys.argv[1]
@@ -22,7 +22,7 @@ networkplan = 'lstmnew'
 # Network = __import__(networkplan).Network
 
 from Network import Network
-from lstm import Node
+from linear import Node
 # 根据需要添加更多的导入选项
 
 def time_elapsed(start_time, mess):
@@ -33,7 +33,7 @@ def measure_performance(chord_net, node_ids, num_trials=50):
     results_insert = []
     results_search = []
 
-    for num_nodes in [10, 50, 100, 200, 500, 1000, 2000, 10000]:  # 不同的节点数
+    for num_nodes in [10,  500, 1000, 2000, 5000]:  # 不同的节点数
     # for num_nodes in [10]:
         print(f'\nTesting with {num_nodes} nodes...')
         results_insert = []  # 重置插入结果列表
