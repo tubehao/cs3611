@@ -15,7 +15,7 @@ if len(sys.argv) > 1:
     plan = sys.argv[1]
 
 # Node = __import__(plan).Node
-from linear import Node
+from lstm import Node
 ################################################################################################################
 
 
@@ -114,7 +114,7 @@ class Network:
 
             node.join(self.first_node)
 
-            # self.fix_network_fingers()
+            self.fix_network_fingers()
         except NetworkError as e:
             print(e)
 

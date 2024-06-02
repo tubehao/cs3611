@@ -11,7 +11,7 @@ if not os.path.exists('.\log'):
     os.makedirs('.\log')
 import hashlib
 nodeplan = 'node'
-networkplan = 'linear'
+networkplan = 'lstm1'
 
 # if len(sys.argv) > 1:
 #     nodeplan = sys.argv[1]
@@ -22,7 +22,7 @@ networkplan = 'linear'
 # Network = __import__(networkplan).Network
 
 from Network import Network
-from linear import Node
+from lstm import Node
 # 根据需要添加更多的导入选项
 
 def time_elapsed(start_time, mess):
