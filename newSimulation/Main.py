@@ -22,14 +22,18 @@ def show_menu(chord_net, node_ids):
 
     while True:
         chord_net.periodic_fix()
-        print('***********************')
-        print('1.Insert node')
-        print('2.Delete node')
-        print('3.Insert data')
-        print('4.Find data')
-        print('5.Delete data')
-        print('0.Exit')
-        print('***********************')
+        print('\n')
+        print("--------------------------------------------------------------------------------")
+        print('                                        MENU                                    ')
+
+        print('--------------------------------------------------------------------------------')
+        print('1.Insert node ')
+        print('2.Delete node ')
+        print('3.Insert data ')
+        print('4.Search data ')
+        print('5.Delete data ')
+        print('0.Exit ')
+        print('--------------------------------------------------------------------------------')
 
         choice = input('Select an operation: ')
 
@@ -64,7 +68,7 @@ def show_menu(chord_net, node_ids):
             path = chord_net.insert_data(query)
 
             time_elapsed(start_time, 'insert data')
-        elif (choice == '2'):
+        elif (choice == '5'):
             # delete data from network
             query = input('[->]Enter data: ')
             start_time = time.time()
@@ -100,7 +104,7 @@ def show_menu(chord_net, node_ids):
 def create_network():
     sys.setrecursionlimit(10000000)
 
-    ascii_banner = pyfiglet.figlet_format('CHORD')
+    ascii_banner = pyfiglet.figlet_format('CS3611 : Chord')
     print(ascii_banner)
     print('Developed by: Konstantinos Bourantas[23 6145]')
     print('---------------------------------------------')

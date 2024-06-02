@@ -21,7 +21,7 @@ networkplan = 'lstm3'
 # Node = __import__(nodeplan).Node
 # Network = __import__(networkplan).Network
 
-from lstmNetwork import Network
+from lstmnewNetwork import Network
 from lstm import Node
 # 根据需要添加更多的导入选项
 
@@ -33,7 +33,7 @@ def measure_performance(chord_net, node_ids, num_trials=50):
     results_insert = []
     results_search = []
 
-    for num_nodes in [500, 1000, 2000, 5000]:  # 不同的节点数
+    for num_nodes in [5000]:  # 不同的节点数
     # for num_nodes in [10]:
         print(f'\nTesting with {num_nodes} nodes...')
         results_insert = []  # 重置插入结果列表
