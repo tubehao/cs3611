@@ -25,7 +25,11 @@ Implements basic node functionality, including searching and maintaining the Fin
 
 Run `python main.py` in the directory and follow the prompts to test basic functionality.
 
-Run `python test.py -node Node -Net Network -n initial_node_count -m ring_size -f number_of_imported_virtual_data -dir directory_to_store_logs` in the directory for large-scale testing.
+Run the following command in the directory for large-scale testing.
+
+```
+python test.py -node Node -Net Network -n initial_node_count -m ring_size -f number_of_imported_virtual_data -dir directory_to_store_logs
+```
 
 Parameter settings are shown in the table below:
 
