@@ -22,15 +22,18 @@ def show_menu(chord_net, node_ids):
 
     while True:
         chord_net.periodic_fix()
-        print('================================================')
-        print('1.Insert new node to network')
-        print('2.Find data in the network')
-        print('3.Insert data to network')
-        print('4.Print network graph')
-        print('5.Print network info')
-        print('6.Delete node from network')
-        print('7.Exit')
-        print('================================================')
+        print('\n')
+        print("--------------------------------------------------------------------------------")
+        print('                                        MENU                                    ')
+
+        print('--------------------------------------------------------------------------------')
+        print('1.Insert node ')
+        print('2.Delete node ')
+        print('3.Insert data ')
+        print('4.Search data ')
+        print('5.Delete data ')
+        print('0.Exit ')
+        print('--------------------------------------------------------------------------------')
 
         choice = input('Select an operation: ')
 
@@ -49,7 +52,7 @@ def show_menu(chord_net, node_ids):
             else:
                 print('[-]Node is already in the network.')
 
-        elif (choice == '2'):
+        elif (choice == '4'):
             # search for data in the network
             query = input('[->]Search data: ')
             start_time = time.time()
@@ -65,23 +68,23 @@ def show_menu(chord_net, node_ids):
             path = chord_net.insert_data(query)
 
             time_elapsed(start_time, 'insert data')
-        elif (choice == '8'):
+        elif (choice == '5'):
             # delete data from network
             query = input('[->]Enter data: ')
             start_time = time.time()
             path = chord_net.delete_data(query)
             time_elapsed(start_time, 'delete data')
 
-        elif (choice == '4'):
+        #elif (choice == '4'):
             # print network graph
-            if(len(chord_net.nodes) > 0):
-                chord_net.print_network()
+        #    if(len(chord_net.nodes) > 0):
+         #       chord_net.print_network()
 
-        elif (choice == '5'):
+        #elif (choice == '5'):
             # print network stats
-            print(chord_net)
+        #   print(chord_net)
 
-        elif (choice == '6'):
+        elif (choice == '2'):
             node_id = int(input('[->]Enter node you wish to delete: '))
 
             node_ids.remove(node_id)
@@ -92,7 +95,7 @@ def show_menu(chord_net, node_ids):
 
             time_elapsed(start_time, 'delete node')
 
-        elif (choice == '7'):
+        elif (choice == '0'):
             sys.exit(0)
 
         print('\n')
@@ -101,7 +104,7 @@ def show_menu(chord_net, node_ids):
 def create_network():
     sys.setrecursionlimit(10000000)
 
-    ascii_banner = pyfiglet.figlet_format('CHORD')
+    ascii_banner = pyfiglet.figlet_format('CS3611 : Chord')
     print(ascii_banner)
     print('Developed by: Konstantinos Bourantas[23 6145]')
     print('---------------------------------------------')
