@@ -10,11 +10,6 @@ import pydotplus
 
 from PIL import Image
 
-plan = 'Node'
-if len(sys.argv) > 1:
-    plan = sys.argv[1]
-
-# Node = __import__(plan).Node
 from Node import Node
 ################################################################################################################
 

@@ -7,16 +7,12 @@ import time
 import threading
 import pydotplus
 
-
 from PIL import Image
-from lstmNode import Node
-################################################################################################################
-
+from SimpleOptimizationNode import Node
 
 class NetworkError(Exception):
     def __init__(self, msg='[-]Network Error!', *args, **kwargs):
         super().__init__(msg, *args, **kwargs)
-
 
 class Network:
     def __init__(self, m, node_ids):
@@ -26,7 +22,6 @@ class Network:
         self.insert_first_node(node_ids[0])
         self.first_node = self.nodes[0]
         node_ids.pop(0)
-        self.times = 0
 
     def __str__(self):
         return f'Chord network:\n |Nodes Alive: {len(self.nodes)} nodes. \n |Total Capacity: {self.ring_size} nodes. \n |Parameter m: {self.m} \n |First Node Inserted: {self.first_node.node_id} \n '
@@ -51,26 +46,16 @@ class Network:
     ################################################################################################################
 
     def hash_function(self, key):
-
         num_bits = Node.m
-
-        # hashed bytes - transform key to hex and the to hashed bytes
-        bt = hashlib.sha1(str.encode(key)).digest()
-
-        # number of desired bytes for the id
+        bt = hashlib.sha256(str.encode(key)).digest()
         req_bytes = (num_bits + 7) // 8
-
-        # transform bytes of the key to int
-        # 'big' : the most significant byte is at the beginning of the byte array
         hashed_id = int.from_bytes(bt[:req_bytes], 'big')
-
-        # wrap hash_id
         if num_bits % 8:
             hashed_id >>= 8 - num_bits % 8
-
         return hashed_id
+
     ################################################################################################################
-    # Node related fucntions
+    # Node related functions
 
     def create_node(self, node_id):
          # create new node object
@@ -93,7 +78,6 @@ class Network:
                 print(e)
 
     def insert_node(self, node_id):
-        self.times += 1
         try:
             if(node_id > self.ring_size):
                 raise NetworkError(
@@ -108,13 +92,10 @@ class Network:
                 f'[+]Node {node.node_id} joined the network via node: {self.first_node.node_id}')
 
             node.join(self.first_node)
-            if self.times % 20 == 0:
-                self.fix_network_fingers()
         except NetworkError as e:
             print(e)
 
     def delete_node(self, node_id):
-
         try:
             node = list(filter(lambda temp_node: temp_node.node_id ==
                                node_id, self.nodes))[0]
@@ -134,96 +115,56 @@ class Network:
     ################################################################################################################
     # Data related functions
     def find_data(self, data):
-
         hashed_key = self.hash_function(data)
-
-        # print(f'[*]Searching  \'{data}\' with key {hashed_key}')
+        print(f'[*]Searching  \'{data}\' with key {hashed_key}')
         node = self.first_node
-
         node, path = node.find_successor(hashed_key)
-
         found_data = node.data.get(hashed_key, None)
-        node.train_model(hashed_key)
-
         if found_data != None:
             print(
-                f'[+]Found \'{data}\' in node {node.node_id} with key {hashed_key}, pathLength: {path}')
+                f'[+]Found \'{data}\' in node {node.node_id} with key {hashed_key}')
         else:
             print(f'[-]\'{data}\' not exist in the network')
         return path
 
     def insert_data(self, key):
         node = self.first_node
-
         hashed_key = self.hash_function(key)
         print(
-            f'[+]Saving Key:{key} with Hash:{hashed_key} -> Node:{node.find_successor(hashed_key)[0].node_id}, path: {node.find_successor(hashed_key)[1]}')
-
+            f'[+]Saving Key:{key} with Hash:{hashed_key} -> Node:{node.find_successor(hashed_key)[0].node_id}')
         succ, path = node.find_successor(hashed_key)
-
         succ.data[hashed_key] = key
-        node.fix_fingers()
         return path
-
-    def delete_data(self, value):
-        hashed_key = self.hash_function(value)
-        # print(f'[*]Deleting \'{value}\' with key {hashed_key}')
-        node = self.first_node
-
-        node, path = node.find_successor(hashed_key)
-
-        if hashed_key in node.data:
-            del node.data[hashed_key]
-            print(f'[+]Deleted \'{value}\' from node {node.node_id} with key {hashed_key}, pathLength: {path}')
-        else:
-            print(f'[-]\'{value}\' not found in the network')
-        return path
-
 
     def generate_fake_data(self, num):
-
         extensions = ['.txt', '.png', '.doc', '.mov', '.jpg', '.py']
         files = [f'file_{i}'+choice(extensions) for i in range(num)]
-
         start_time = time.time()
         for temp in files:
             self.insert_data(temp)
-
         print(f'\n {float(time.time() - start_time)/num} seconds ---')
 
     ################################################################################################################
 
     def print_network(self):
         f = open('graph.dot', 'w+')
-        # print('digraph G {')
         f.write('digraph G {\r\n')
         for node in self.nodes:
             data = 'Keys:\n-------------\n'
-            # print(f'{node.node_id} -> {node.successor.node_id}')
             f.write(f'{node.node_id} -> {node.successor.node_id}\r\n')
             for key in sorted(node.data.keys()):
                 data += f'key: {key} - data: \'{node.data[key]}\'\n'
-
             fingers = 'Finger Table:\n-------------\n'
             for i in range(self.m):
-
                 fingers += f'{(node.node_id + 2 ** i) % self.ring_size} : {node.fingers_table[i].node_id}\n'
-
             if data != '' and data != 'Keys:\n-------------\n':
-                # print(f'data_{node.node_id} [label='{data}', shape=box]')
                 f.write(
                     f'data_{node.node_id} [label=\"{data}\", shape=box]\r\n')
-                # print(f'{node.node_id}->data_{node.node_id}')
                 f.write(f'{node.node_id}->data_{node.node_id}\r\n')
-
             if fingers != '':
-                # print(f'fingers_{node.node_id} [label='{fingers}', shape=box]')
                 f.write(
                     f'fingers_{node.node_id} [label=\"{fingers}\", shape=box]\r\n')
-                # print(f'{node.node_id}->fingers_{node.node_id}')
                 f.write(f'{node.node_id}->fingers_{node.node_id}\r\n')
-
-        # print('}')
         f.write('}')
         f.close()
 
@@ -235,8 +176,7 @@ class Network:
         except pydotplus.graphviz.InvocationException:
             pass
 
-    def periodic_fix(self):
-        threading.Timer(15, self.fix_network_fingers).start()
-
-
-################################################################################################################
+    def periodic_fix(self, interval=15):
+        for node in self.nodes:
+            node.fix_fingers()
+        threading.Timer(interval, self.periodic_fix).start()

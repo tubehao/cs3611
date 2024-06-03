@@ -9,12 +9,13 @@ import pydotplus
 
 
 from PIL import Image
-from lstmNode import Node
+
+from hotKeyPrioritizationNode import Node
 ################################################################################################################
 
 
 class NetworkError(Exception):
-    def __init__(self, msg='[-]Network Error!', *args, **kwargs):
+    def __init__(self, msg='Network Error!', *args, **kwargs):
         super().__init__(msg, *args, **kwargs)
 
 
@@ -26,7 +27,6 @@ class Network:
         self.insert_first_node(node_ids[0])
         self.first_node = self.nodes[0]
         node_ids.pop(0)
-        self.times = 0
 
     def __str__(self):
         return f'Chord network:\n |Nodes Alive: {len(self.nodes)} nodes. \n |Total Capacity: {self.ring_size} nodes. \n |Parameter m: {self.m} \n |First Node Inserted: {self.first_node.node_id} \n '
@@ -83,21 +83,20 @@ class Network:
             try:
                 if(node.node_id > self.ring_size):
                     raise NetworkError(
-                        '[-]Node id should be smaller or equal to the networks size.')
+                        'Node id should be smaller or equal to the networks size.')
                 # add new node to the network
                 print(
-                    f'[+]Node {node.node_id} joined the network via node: {self.first_node.node_id}')
+                    f'Node {node.node_id} joined Chord network with Predecessor node: {self.first_node.node_id}')
 
                 node.join(self.first_node)
             except NetworkError as e:
                 print(e)
 
     def insert_node(self, node_id):
-        self.times += 1
         try:
             if(node_id > self.ring_size):
                 raise NetworkError(
-                    '[-]Node id should be smaller or equal to the networks size.')
+                    'Node id should be smaller or equal to the networks size.')
 
             self.nodes.append(self.create_node(node_id))
 
@@ -105,11 +104,9 @@ class Network:
 
             # add new node to the network
             print(
-                f'[+]Node {node.node_id} joined the network via node: {self.first_node.node_id}')
+                f'Node {node.node_id} joined Chord network with Predecessor node: {self.first_node.node_id}')
 
             node.join(self.first_node)
-            if self.times % 20 == 0:
-                self.fix_network_fingers()
         except NetworkError as e:
             print(e)
 
@@ -119,14 +116,14 @@ class Network:
             node = list(filter(lambda temp_node: temp_node.node_id ==
                                node_id, self.nodes))[0]
         except:
-            print(f'[-]Node {node_id} wasn\'t found!')
+            print(f'Node {node_id} wasn\'t found!')
         else:
             node.leave()
             self.nodes.remove(node)
             self.fix_network_fingers()
 
     def insert_first_node(self, node_id):
-        print(f'[!]Initializing network , inserting first node {node_id}\n')
+        print(f'Initializing network , inserting first node {node_id}\n')
         # create new node object
         node = Node(node_id, self.m)
         # add node to nodes of network
@@ -143,13 +140,12 @@ class Network:
         node, path = node.find_successor(hashed_key)
 
         found_data = node.data.get(hashed_key, None)
-        node.train_model(hashed_key)
 
         if found_data != None:
             print(
-                f'[+]Found \'{data}\' in node {node.node_id} with key {hashed_key}, pathLength: {path}')
+                f'Found \'{data}\' in node {node.node_id} with Key: {hashed_key}, PathLength: {path}')
         else:
-            print(f'[-]\'{data}\' not exist in the network')
+            print(f'\'{data}\' not exist in Chord Network')
         return path
 
     def insert_data(self, key):
@@ -157,12 +153,11 @@ class Network:
 
         hashed_key = self.hash_function(key)
         print(
-            f'[+]Saving Key:{key} with Hash:{hashed_key} -> Node:{node.find_successor(hashed_key)[0].node_id}, path: {node.find_successor(hashed_key)[1]}')
+            f'Saving Key:{key} with Hash:{hashed_key} -> Node:{node.find_successor(hashed_key)[0].node_id}, Path: {node.find_successor(hashed_key)[1]}')
 
         succ, path = node.find_successor(hashed_key)
 
         succ.data[hashed_key] = key
-        node.fix_fingers()
         return path
 
     def delete_data(self, value):
@@ -174,9 +169,9 @@ class Network:
 
         if hashed_key in node.data:
             del node.data[hashed_key]
-            print(f'[+]Deleted \'{value}\' from node {node.node_id} with key {hashed_key}, pathLength: {path}')
+            print(f'Deleted \'{value}\' from node {node.node_id} with Key: {hashed_key}, PathLength: {path}')
         else:
-            print(f'[-]\'{value}\' not found in the network')
+            print(f'\'{value}\' not found in Chord Network')
         return path
 
 
@@ -189,7 +184,7 @@ class Network:
         for temp in files:
             self.insert_data(temp)
 
-        print(f'\n {float(time.time() - start_time)/num} seconds ---')
+        #print(f'\n {float(time.time() - start_time)/num} seconds ---')
 
     ################################################################################################################
 

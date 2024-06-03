@@ -15,7 +15,7 @@ if len(sys.argv) > 1:
     plan = sys.argv[1]
 
 # Node = __import__(plan).Node
-from linear import Node
+from linearNode import Node
 ################################################################################################################
 
 
