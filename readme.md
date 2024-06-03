@@ -2,83 +2,95 @@
 
 ## Simulation
 
-Chord协议的简单模拟。
+Logical layer simulation of the Chord protocol.
 
-### Enviroment
+### Environment
 
 - Python 3.8+
 - torch
 - pydotplus
 - pyfiglet
 - random
+- hashlib
 
-### Network.py 
+### Network.py
 
-实现了基本的节点的加入，数据查找等网络功能。
+Implements basic network functions such as node joining and data lookup.
 
 ### Node.py
 
-实现了基本的node节点的功能，包括查找和维护Finger Table，添加的功能基于Node.py实现在对应名称的python文件中。
+Implements basic node functionality, including searching and maintaining the Finger Table. Optimization schemes are implemented in the corresponding Python files based on Node.py.
 
-### 使用方式
+### Usage
 
-在目录下运行`python main.py`，根据提示菜单输入，可以进行基本的功能的测试。
+Run `python main.py` in the directory and follow the prompts to test basic functionality.
 
-在目录下运行`python test.py -node Node -Net Network -n 初始节点数目 -m 环的大小 -f 导入的虚拟数据的数目 -dir 存储日志的目录`，测试代码。
+Run `python test.py -node Node -Net Network -n initial_node_count -m ring_size -f number_of_imported_virtual_data -dir directory_to_store_logs` in the directory for large-scale testing.
+
+Parameter settings are shown in the table below:
+
+| Plan                   | -node                    | -Net                        |
+| ---------------------- | ------------------------ | --------------------------- |
+| Baseline               | Node                     | Network                     |
+| Dynamic Finger Updates | Node                     | dynamicFinerUpdateNetwork   |
+| Enhanced Hashing       | SimpleOptimizationNode   | simpleOptimizationNetwork   |
+| Hot Key Prioritization | hotKeyPrioritizationNode | hotKeyPrioritizationNetwork |
+| PMLR                   | linearNode               | linearNetwork               |
+| LSTM                   | lstmNode                 | lstmNetwork                 |
 
 ## Implementation
 
-实现了基于显示连接的Chord协议，但是由于计算机设备限制，只能在小规模下测试。
+Implemented the Chord protocol based on explicit connections, but due to device limitations, it can only be tested on a small scale.
 
-### Enviroment
+### Environment
 
-- Python 3.8+
-- torch
-- pydotplus
-- pyfiglet
-- random
+- Python 3.10
+- socket
+- hashlib
 
 ### Node.py
 
-建立一个Node，在计算机下通过下述命令运行Node.py，则就是将本机加入了Chord网络，当非第一个的新节点加入时，需要给出一个已加入的节点的端口。
+Create a Node. Run Node.py on a computer using the following command to join the Chord network. When a new node other than the first one joins, the port of an already joined node needs to be provided.
 
-+ 添加第一个节点：
++ Adding the first node:
     ```
-    python Node.py port1
+    python Node.py yourPort
     ```
-+ 添加其他节点：
++ Adding other nodes:
     ```
-    python Node.py anyAddedPort
+    python Node.py yourPort anyAddedPort
     ```
 
-### 客户端访问：
+### Client Access
 
-通过运行下述命令，根据提示输入即可访问建立在任意端口的Node，进行查找插入删除等工作。
+Run the following command and follow the prompts to access the Node established on any port for searching, inserting, deleting, etc.
 
     python Client.py
 
-对于每一次插入数据，自动在log中记录本次查找的信息，log文件中已有的是我们做的一些实验。
+For each data insertion, the information of the current lookup is automatically recorded in the log. The existing information in the log file is some experiments we have done.
 
 ## Visualization
 
 ### Environment
 
 + Node.js
-
 + npm
-
 + react
 
 ### Run
 
- Input instruction: 
+Input instruction to start:  
 
 ```
 npm install react-scripts
 npm start
 ```
 
-(if the prompt 'react scripts' is incorrect, it is not an internal or external command, nor is it a runnable program)
+If the prompt 'react scripts' is incorrect, it is not an internal or external command, nor is it a runnable program.
 
+# Appendix
 
+We completed our implementation based on the following two GitHub repositories:
 
+https://github.com/Er-AbhishekRaj07/Chord-DHT-P2P-Network
+https://github.com/omnone/CHORD-Simulation/blob/master
