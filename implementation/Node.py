@@ -46,6 +46,7 @@ class Node:
         self.finger_table = FingerTable(self.id)
         self.data_store = DataStore()
         self.request_handler = RequestHandler()
+        self.is_started = False
 
     def hash(self, message):
         # This function is used to find the id of any string and hence find it's correct position in the ring
@@ -138,8 +139,16 @@ class Node:
         if operation == "notify":
             # print("notifiying")
             self.notify(int(args[0]),args[1],args[2])
+
+        if operation == "status":
+            result = self.get_join_status()
+
         # print(result)
         return str(result)
+
+    def get_join_status(self):
+        return "joined" if self.is_started else "not joined"
+
     def serve_requests(self, conn, addr):
         
         # The serve_requests fucntion is used to listen to incoming requests on the open port and then reply to them, it 
@@ -172,10 +181,12 @@ class Node:
             s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
             s.bind((self.nodeinfo.ip, self.nodeinfo.port))
             s.listen()
+            self.is_started = True
             while True:
                 conn, addr = s.accept()
                 t = threading.Thread(target=self.serve_requests, args=(conn,addr))
-                t.start()   
+                t.start()
+
     def append_to_log(self, operation, node_info, key, value, message):
         with open('log.txt', 'a') as log_file:
             log_file.write(str(time.time()) + " , " + operation + " , " + str(node_info) + " , " + key + " ,pathLength:" + str(message) + '\n')
@@ -357,26 +368,26 @@ class Node:
                 self.successor = Node(ip,port)
                 self.finger_table.table[0][1] = self.successor
             self.request_handler.send_message(self.successor.ip , self.successor.port, "notify|"+ str(self.id) + "|" + self.nodeinfo.__str__())
-            print("===============================================")
-            print("STABILIZING")
-            print("===============================================")
-            print("ID: ", self.id)
-            if self.successor is not None:
-                print("Successor ID: " , self.successor.id)
-            if self.predecessor is not None:
-                print("predecessor ID: " , self.predecessor.id)
-            print("===============================================")
-            print("=============== FINGER TABLE ==================")
-            self.finger_table.print()
-            print("===============================================")
-            print("DATA STORE")
-            print("===============================================")
-            print(str(self.data_store.data))
-            print("===============================================")
-            print("+++++++++++++++ END +++++++++++++++++++++++++++")
-            print()
-            print()
-            print()
+            # print("===============================================")
+            # print("STABILIZING")
+            # print("===============================================")
+            # print("ID: ", self.id)
+            # if self.successor is not None:
+            #     print("Successor ID: " , self.successor.id)
+            # if self.predecessor is not None:
+            #     print("predecessor ID: " , self.predecessor.id)
+            # print("===============================================")
+            # print("=============== FINGER TABLE ==================")
+            # self.finger_table.print()
+            # print("===============================================")
+            # print("DATA STORE")
+            # print("===============================================")
+            # print(str(self.data_store.data))
+            # print("===============================================")
+            # print("+++++++++++++++ END +++++++++++++++++++++++++++")
+            # print()
+            # print()
+            # print()
             time.sleep(10)
 
     def notify(self, node_id , node_ip , node_port):
@@ -487,29 +498,27 @@ class FingerTable:
 # then sends the message to the desired node.
 class RequestHandler:
 
-    request_lock = threading.Lock()
+    # request_lock = threading.Lock()
     def __init__(self):
         pass
     def send_message(self, ip, port, message, retries=10, backoff_factor=1.5):
-        attempt = 0
-        s = None
-        while attempt < retries:
-            try:
-                s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-                s.connect((ip, port))
-                s.send(message.encode('utf-8'))
-                data = s.recv(1024)
-                return data.decode("utf-8")
-            except ConnectionRefusedError as e:
-                print(f"Error checking port {port}: {e}")
-                attempt += 1
-                print(f"Attempt {attempt}: Connection to {ip}:{port} refused. Retrying in {backoff_factor ** attempt:.2f} seconds...")
-                time.sleep(backoff_factor ** attempt)
-            finally:
-                if s is not None:
+        # with RequestHandler.request_lock:
+            attempt = 0
+            while attempt < retries:
+                try:
+                    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                    s.connect((ip, port))
+                    s.send(message.encode('utf-8'))
+                    data = s.recv(1024)
+                    return data.decode("utf-8")
+                except ConnectionRefusedError as e:
+                    attempt += 1
+                    print(f"Attempt {attempt}: Connection to {ip}:{port} refused. Retrying in {backoff_factor ** attempt:.2f} seconds...")
+                    time.sleep(backoff_factor ** attempt)
+                finally:
                     s.close()
-        print(f"Failed to connect to {ip}:{port} after {retries} attempts.")
-        return None
+            print(f"Failed to connect to {ip}:{port} after {retries} attempts.")
+            return None
 
 # The ip = "127.0.0.1" signifies that the node is executing on the localhost
 
